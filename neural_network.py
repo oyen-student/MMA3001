@@ -29,15 +29,16 @@ class PyTorchMLP(nn.Module):
 
 def train_optimized_mlp(X_train, y_train, X_val, y_val, hidden_sizes=(128, 64, 32), target_scale=1000.0, epochs=150, batch_size=64, lr=0.001):
     # Prepare inputs and targets scaled to Tensor
-    X_tr_t = torch.tensor(X_train, dtype=torch.float32)
-    y_tr_t = torch.tensor(y_train * target_scale, dtype=torch.float32).unsqueeze(1)
+    X_tr_t = torch.tensor(np.array(X_train), dtype=torch.float32)
+    y_tr_t = torch.tensor(np.array(y_train) * target_scale, dtype=torch.float32).unsqueeze(1)
     
     dataset = TensorDataset(X_tr_t, y_tr_t)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
     model = PyTorchMLP(X_train.shape[1], hidden_sizes).to(device)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=15)
     
     loss_history = []
     model.train()
@@ -49,9 +50,12 @@ def train_optimized_mlp(X_train, y_train, X_val, y_val, hidden_sizes=(128, 64, 3
             preds = model(batch_X)
             loss = criterion(preds, batch_y)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             epoch_loss += loss.item() * batch_X.size(0)
-        loss_history.append(epoch_loss / len(X_train))
+        epoch_avg_loss = epoch_loss / len(X_train)
+        loss_history.append(epoch_avg_loss)
+        scheduler.step(epoch_avg_loss)
         
     return model, loss_history
 
