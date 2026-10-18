@@ -36,7 +36,7 @@ if __name__ == '__main__':
     
     # 3. Optimized MLP Regressor with loss tracking and plotting
     target_scale = 1000.0
-    mlp_model, loss_history = train_optimized_mlp(X_train, y_train, X_val, y_val, target_scale=target_scale, epochs=100)
+    mlp_model, loss_history = train_optimized_mlp(X_train, y_train, X_val, y_val, target_scale=target_scale, epochs=300)
     val_preds = evaluate_pytorch_model(mlp_model, X_val, target_scale=target_scale)
     print(f"Optimized MLP Validation MSE: {mean_squared_error(y_val, val_preds):.4e}")
     
