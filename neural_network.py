@@ -49,10 +49,11 @@ def train_optimized_mlp(
     lr=1e-3,
     weight_decay=1e-4,
     patience=20,
-    min_delta=1e-5,
+    min_delta=1e-6,
+    grad_clip=1.0,
     seed=42,
 ):
-    """Train using scaled targets and return best-validation model and history."""
+    """Train with comparable loss tracking, gradient clipping, and early stopping."""
     set_seed(seed)
     device = get_device()
     X_train_t = torch.as_tensor(np.asarray(X_train), dtype=torch.float32)
@@ -74,7 +75,10 @@ def train_optimized_mlp(
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     criterion = nn.MSELoss()
 
-    history = {"train_loss": [], "val_loss": []}
+    history = {
+        "train_loss": [], "val_loss": [],
+        "grad_norm_mean": [], "grad_norm_max": [],
+    }
     best_val = float("inf")
     best_state = deepcopy(model.state_dict())
     best_epoch = 0
@@ -82,23 +86,31 @@ def train_optimized_mlp(
 
     for epoch in range(epochs):
         model.train()
-        train_sum = 0.0
+        epoch_grad_norms = []
         for batch_X, batch_y in loader:
             batch_X = batch_X.to(device)
             batch_y = batch_y.to(device)
             optimizer.zero_grad(set_to_none=True)
             loss = criterion(model(batch_X), batch_y)
             loss.backward()
+            # Record the global gradient norm before optional clipping.
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                model.parameters(),
+                max_norm=grad_clip if grad_clip is not None else float("inf"),
+            )
+            epoch_grad_norms.append(float(grad_norm.detach().cpu()))
             optimizer.step()
-            train_sum += loss.item() * len(batch_X)
 
-        train_loss = train_sum / len(X_train_t)
+        # Measure both losses after the epoch's updates in evaluation mode.
         model.eval()
         with torch.no_grad():
+            train_loss = criterion(model(X_train_t.to(device)), y_train_t.to(device)).item()
             val_loss = criterion(model(X_val_t), y_val_t).item()
 
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
+        history["grad_norm_mean"].append(float(np.mean(epoch_grad_norms)))
+        history["grad_norm_max"].append(float(np.max(epoch_grad_norms)))
 
         if val_loss < best_val - min_delta:
             best_val = val_loss
@@ -145,6 +157,25 @@ def plot_training_history(history, save_path=None):
     ax.set_xlabel("Epoch")
     ax.set_ylabel("MSE (standardised target)")
     ax.set_title("MLP training and validation convergence")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=160)
+    plt.show()
+
+
+def plot_gradient_norms(history, save_path=None):
+    """Plot mean and maximum pre-clipping gradient norms per epoch."""
+    if not history.get("grad_norm_mean"):
+        return
+    epochs = np.arange(1, len(history["grad_norm_mean"]) + 1)
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(epochs, history["grad_norm_mean"], label="Mean gradient norm")
+    ax.plot(epochs, history["grad_norm_max"], label="Maximum gradient norm", alpha=0.8)
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Global gradient norm (before clipping)")
+    ax.set_title("MLP gradient-norm diagnostics")
     ax.grid(True, alpha=0.3)
     ax.legend()
     fig.tight_layout()
