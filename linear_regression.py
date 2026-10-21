@@ -1,8 +1,20 @@
-
+"""Simple baselines for hull-resistance regression."""
+import numpy as np
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
+
+
+class MeanBaseline:
+    """Predict the training-set mean for every sample."""
+
+    def fit(self, X, y):
+        self.mean_ = float(np.mean(y))
+        return self
+
+    def predict(self, X):
+        return np.full(len(X), self.mean_, dtype=float)
+
 
 def train_linear_regression(X_train, y_train):
-    lr = LinearRegression()
-    lr.fit(X_train, y_train)
-    return lr
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    return model
