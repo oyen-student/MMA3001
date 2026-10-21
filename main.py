@@ -13,6 +13,7 @@ from neural_network import (
     plot_training_history,
     plot_predictions,
     plot_residuals,
+    plot_gradient_norms,
     run_architecture_sweep,
     plot_sweep_results,
 )
@@ -47,6 +48,14 @@ def main():
         "--patience", type=int, default=50,
         help="Epochs without validation improvement before early stopping.",
     )
+    parser.add_argument(
+        "--min-delta", type=float, default=1e-6,
+        help="Minimum validation-MSE improvement (standardised target) to reset early stopping.",
+    )
+    parser.add_argument(
+        "--grad-clip", type=float, default=1.0,
+        help="Maximum global gradient norm; set 0 to disable clipping.",
+    )
     parser.add_argument("--skip-tuning", action="store_true", help="Use a fixed modest MLP instead of Optuna.")
     parser.add_argument("--sweep", action="store_true", help="Run an additional architecture sweep (extra compute).")
     parser.add_argument("--output-dir", default="outputs", help="Directory for plots and metrics JSON.")
@@ -57,6 +66,11 @@ def main():
         parser.error("--epochs must be at least 1.")
     if args.patience < 1:
         parser.error("--patience must be at least 1.")
+    if args.min_delta < 0:
+        parser.error("--min-delta must be non-negative.")
+    if args.grad_clip < 0:
+        parser.error("--grad-clip must be non-negative.")
+    grad_clip = args.grad_clip if args.grad_clip > 0 else None
 
     if not args.data.is_file():
         raise FileNotFoundError(
@@ -86,7 +100,7 @@ def main():
         sweep_df = run_architecture_sweep(
             X_train, data["y_train_scaled"], X_val, data["y_val_scaled"],
             data["y_scaler"], epochs=args.epochs, patience=args.patience,
-            seed=args.seed,
+            min_delta=args.min_delta, grad_clip=grad_clip, seed=args.seed,
         )
         sweep_df.to_csv(output_dir / "architecture_sweep.csv", index=False)
         plot_sweep_results(sweep_df, output_dir / "architecture_sweep.png")
@@ -119,7 +133,8 @@ def main():
             X_train, data["y_train_scaled"],
             X_val, data["y_val_scaled"], data["y_scaler"],
             n_trials=args.trials, max_epochs=args.epochs,
-            patience=args.patience, seed=args.seed,
+            patience=args.patience, min_delta=args.min_delta,
+            grad_clip=grad_clip, seed=args.seed,
         )
         config = best_model_config(study)
         print(f"Best Optuna validation MSE: {study.best_value:.6g}")
@@ -135,9 +150,12 @@ def main():
         batch_size=config["batch_size"],
         epochs=args.epochs,
         patience=args.patience,
+        min_delta=args.min_delta,
+        grad_clip=grad_clip,
         seed=args.seed,
     )
     plot_training_history(history, output_dir / "training_validation_loss.png")
+    plot_gradient_norms(history, output_dir / "gradient_norms.png")
 
     # Keep test data out of model selection; evaluate each final model here.
     for name, baseline in baselines.items():
