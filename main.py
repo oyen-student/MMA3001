@@ -27,7 +27,8 @@ def main():
         help="Row of coefStatMatrix to predict (DEFAULT 0 MUST be verified from dataset documentation).",
     )
     parser.add_argument("--trials", type=int, default=20, help="Number of Optuna trials.")
-    parser.add_argument("--skip-tuning", action="store_true", help="Use a fixed modest MLP instead of Optuna.")\n    parser.add_argument("--sweep", action="store_true", help="Run an additional architecture sweep (extra compute).")
+    parser.add_argument("--skip-tuning", action="store_true", help="Use a fixed modest MLP instead of Optuna.")
+    parser.add_argument("--sweep", action="store_true", help="Run an additional architecture sweep (extra compute).")
     parser.add_argument("--output-dir", default="outputs", help="Directory for plots and metrics JSON.")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
@@ -44,7 +45,17 @@ def main():
     X_train, X_val, X_test = data["X_train"], data["X_val"], data["X_test"]
     y_train, y_val, y_test = data["y_train"], data["y_val"], data["y_test"]
 
-    # Optional architecture sweep: select by validation performance only.\n    if args.sweep:\n        sweep_df = run_architecture_sweep(\n            X_train, data["y_train_scaled"], X_val, data["y_val_scaled"],\n            data["y_scaler"], seed=args.seed,\n        )\n        sweep_df.to_csv(output_dir / "architecture_sweep.csv", index=False)\n        plot_sweep_results(sweep_df, output_dir / "architecture_sweep.png")\n        print("Best sweep architecture:", sweep_df.iloc[0]["architecture"])\n\n    # Baselines: constant mean and linear regression.
+    # Optional architecture sweep: select by validation performance only.
+    if args.sweep:
+        sweep_df = run_architecture_sweep(
+            X_train, data["y_train_scaled"], X_val, data["y_val_scaled"],
+            data["y_scaler"], seed=args.seed,
+        )
+        sweep_df.to_csv(output_dir / "architecture_sweep.csv", index=False)
+        plot_sweep_results(sweep_df, output_dir / "architecture_sweep.png")
+        print("Best sweep architecture:", sweep_df.iloc[0]["architecture"])
+
+    # Baselines: constant mean and linear regression.
     baselines = {
         "Mean baseline": MeanBaseline().fit(X_train, y_train),
         "Linear regression": train_linear_regression(X_train, y_train),
