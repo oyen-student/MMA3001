@@ -232,6 +232,8 @@ def run_architecture_sweep(
     architectures=None,
     epochs=500,
     patience=50,
+    min_delta=1e-6,
+    grad_clip=1.0,
     seed=42,
 ):
     """Compare architectures on validation MSE; does not inspect the test set."""
@@ -254,6 +256,8 @@ def run_architecture_sweep(
             hidden_sizes=architecture,
             epochs=epochs,
             patience=patience,
+            min_delta=min_delta,
+            grad_clip=grad_clip,
             seed=seed + index,
         )
         train_pred = evaluate_pytorch_model(model, X_train, y_scaler)
