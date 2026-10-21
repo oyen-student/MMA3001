@@ -1,129 +1,186 @@
+"""PyTorch MLP regression, early stopping, and evaluation plots."""
+from copy import deepcopy
+import random
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import itertools
+import numpy as np
+import torch
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def get_device():
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class PyTorchMLP(nn.Module):
-    def __init__(self, input_dim, hidden_sizes):
-        super(PyTorchMLP, self).__init__()
+    def __init__(self, input_dim, hidden_sizes=(64, 32)):
+        super().__init__()
         layers = []
         in_dim = input_dim
-        for h_size in hidden_sizes:
-            layers.append(nn.Linear(in_dim, h_size))
-            layers.append(nn.ReLU())
-            in_dim = h_size
+        for width in hidden_sizes:
+            layers.extend([nn.Linear(in_dim, int(width)), nn.ReLU()])
+            in_dim = int(width)
         layers.append(nn.Linear(in_dim, 1))
         self.network = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.network(x)
 
-def train_optimized_mlp(X_train, y_train, X_val, y_val, hidden_sizes=(128, 64, 32), target_scale=1000.0, epochs=150, batch_size=64, lr=0.001):
-    # Prepare inputs and targets scaled to Tensor
-    X_tr_t = torch.tensor(X_train, dtype=torch.float32)
-    y_tr_t = torch.tensor(y_train * target_scale, dtype=torch.float32).unsqueeze(1)
-    
-    dataset = TensorDataset(X_tr_t, y_tr_t)
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    
+
+def train_optimized_mlp(
+    X_train,
+    y_train_scaled,
+    X_val,
+    y_val_scaled,
+    hidden_sizes=(64, 32),
+    epochs=200,
+    batch_size=64,
+    lr=1e-3,
+    weight_decay=1e-4,
+    patience=20,
+    min_delta=1e-5,
+    seed=42,
+):
+    """Train using scaled targets and return best-validation model and history."""
+    set_seed(seed)
+    device = get_device()
+    X_train_t = torch.as_tensor(np.asarray(X_train), dtype=torch.float32)
+    y_train_t = torch.as_tensor(np.asarray(y_train_scaled), dtype=torch.float32).reshape(-1, 1)
+    X_val_t = torch.as_tensor(np.asarray(X_val), dtype=torch.float32, device=device)
+    y_val_t = torch.as_tensor(np.asarray(y_val_scaled), dtype=torch.float32, device=device)
+
+    loader = DataLoader(
+        TensorDataset(X_train_t, y_train_t),
+        batch_size=min(batch_size, len(X_train_t)),
+        shuffle=True,
+        generator=torch.Generator().manual_seed(seed),
+    )
     model = PyTorchMLP(X_train.shape[1], hidden_sizes).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
-    
-    loss_history = []
-    model.train()
+
+    history = {"train_loss": [], "val_loss": []}
+    best_val = float("inf")
+    best_state = deepcopy(model.state_dict())
+    best_epoch = 0
+    epochs_without_improvement = 0
+
     for epoch in range(epochs):
-        epoch_loss = 0.0
+        model.train()
+        train_sum = 0.0
         for batch_X, batch_y in loader:
-            batch_X, batch_y = batch_X.to(device), batch_y.to(device)
-            optimizer.zero_grad()
-            preds = model(batch_X)
-            loss = criterion(preds, batch_y)
+            batch_X = batch_X.to(device)
+            batch_y = batch_y.to(device)
+            optimizer.zero_grad(set_to_none=True)
+            loss = criterion(model(batch_X), batch_y)
             loss.backward()
             optimizer.step()
-            epoch_loss += loss.item() * batch_X.size(0)
-        loss_history.append(epoch_loss / len(X_train))
-        
-    return model, loss_history
+            train_sum += loss.item() * len(batch_X)
 
-def evaluate_pytorch_model(model, X_data, target_scale=1000.0):
+        train_loss = train_sum / len(X_train_t)
+        model.eval()
+        with torch.no_grad():
+            val_loss = criterion(model(X_val_t), y_val_t).item()
+
+        history["train_loss"].append(train_loss)
+        history["val_loss"].append(val_loss)
+
+        if val_loss < best_val - min_delta:
+            best_val = val_loss
+            best_state = deepcopy(model.state_dict())
+            best_epoch = epoch + 1
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= patience:
+                break
+
+    model.load_state_dict(best_state)
+    model.eval()
+    history["best_epoch"] = best_epoch
+    history["stopped_epoch"] = len(history["train_loss"])
+    history["best_val_loss_scaled"] = best_val
+    return model, history
+
+
+def evaluate_pytorch_model(model, X_data, y_scaler):
+    """Return predictions in the target's original physical units."""
+    device = next(model.parameters()).device
+    X_t = torch.as_tensor(np.asarray(X_data), dtype=torch.float32, device=device)
     model.eval()
     with torch.no_grad():
-        X_t = torch.tensor(X_data, dtype=torch.float32).to(device)
-        preds = model(X_t).cpu().numpy().flatten()
-    return preds / target_scale
+        pred_scaled = model(X_t).cpu().numpy().reshape(-1, 1)
+    return y_scaler.inverse_transform(pred_scaled).ravel()
 
-def plot_predictions(y_true, y_pred, title):
-    mse = mean_squared_error(y_true, y_pred)
-    mae = mean_absolute_error(y_true, y_pred)
-    r2 = r2_score(y_true, y_pred)
 
-    plt.figure(figsize=(8, 6))
-    sns.scatterplot(x=y_true, y=y_pred, alpha=0.4, color='darkslateblue', s=15)
-    min_val, max_val = min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())
-    plt.plot([min_val, max_val], [min_val, max_val], 'r--', lw=2)
-    plt.title(title, fontsize=12, fontweight='bold')
-    plt.xlabel('Actual C_w')
-    plt.ylabel('Predicted C_w')
-    plt.grid(True, linestyle='--', alpha=0.5)
-    text_str = f'MSE: {mse:.4e}\nMAE: {mae:.4e}\nR²: {r2:.4f}'
-    plt.gca().text(0.05, 0.95, text_str, transform=plt.gca().transAxes, fontsize=10,
-                 verticalalignment='top', bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.85))
-    plt.tight_layout()
+def regression_metrics(y_true, y_pred):
+    return {
+        "MSE": float(mean_squared_error(y_true, y_pred)),
+        "RMSE": float(np.sqrt(mean_squared_error(y_true, y_pred))),
+        "MAE": float(mean_absolute_error(y_true, y_pred)),
+        "R2": float(r2_score(y_true, y_pred)),
+    }
+
+
+def plot_training_history(history, save_path=None):
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(np.arange(1, len(history["train_loss"]) + 1), history["train_loss"], label="Training loss")
+    ax.plot(np.arange(1, len(history["val_loss"]) + 1), history["val_loss"], label="Validation loss")
+    ax.axvline(history["best_epoch"], linestyle="--", alpha=0.7, label=f"Best epoch: {history['best_epoch']}")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("MSE (standardised target)")
+    ax.set_title("MLP training and validation convergence")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=160)
     plt.show()
 
-def run_parameter_sweep(X_train, y_train, X_val, y_val, target_scale=1000.0):
-    layer_options = [1, 2, 3]
-    node_options = [32, 64, 128]
 
-    architectures = []
-    for num_layers in layer_options:
-        for arch in itertools.product(node_options, repeat=num_layers):
-            architectures.append(arch)
+def plot_predictions(y_true, y_pred, title="Predicted vs actual", save_path=None):
+    metrics = regression_metrics(y_true, y_pred)
+    lo = float(min(np.min(y_true), np.min(y_pred)))
+    hi = float(max(np.max(y_true), np.max(y_pred)))
+    fig, ax = plt.subplots(figsize=(7, 6))
+    ax.scatter(y_true, y_pred, alpha=0.55, s=18)
+    ax.plot([lo, hi], [lo, hi], "k--", linewidth=1.5)
+    ax.set_xlabel("Actual target")
+    ax.set_ylabel("Predicted target")
+    ax.set_title(title)
+    ax.text(
+        0.04, 0.96,
+        f"RMSE: {metrics['RMSE']:.4g}\nMAE: {metrics['MAE']:.4g}\nR²: {metrics['R2']:.4f}",
+        transform=ax.transAxes, va="top",
+        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.85},
+    )
+    ax.grid(True, alpha=0.25)
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=160)
+    plt.show()
 
-    results = []
-    for arch in architectures:
-        model, _ = train_optimized_mlp(X_train, y_train, X_val, y_val, hidden_sizes=arch, target_scale=target_scale, epochs=80, batch_size=64, lr=0.001)
-        
-        train_preds = evaluate_pytorch_model(model, X_train, target_scale)
-        train_mse = mean_squared_error(y_train, train_preds)
 
-        val_preds = evaluate_pytorch_model(model, X_val, target_scale)
-        val_mse = mean_squared_error(y_val, val_preds)
-
-        results.append({
-            'architecture': arch,
-            'train_mse': train_mse,
-            'val_mse': val_mse
-        })
-
-    results_df = pd.DataFrame(results)
-    results_df['Arch_Str'] = results_df['architecture'].apply(lambda x: str(x))
-    return results_df
-
-def plot_sweep_results(results_df):
-    plt.figure(figsize=(16, 7))
-    x_indices = np.arange(len(results_df))
-    bar_width = 0.35
-
-    plt.bar(x_indices - bar_width/2, results_df['train_mse'], width=bar_width, label='Training MSE', color='royalblue', alpha=0.85)
-    plt.bar(x_indices + bar_width/2, results_df['val_mse'], width=bar_width, label='Validation MSE', color='darkorange', alpha=0.85)
-
-    plt.xticks(x_indices, results_df['Arch_Str'], rotation=90, fontsize=9)
-    plt.yscale('log')
-    plt.xlabel('Hidden Layer Architecture (Layers, Nodes)', fontweight='bold')
-    plt.ylabel('Mean Squared Error (Log Scale)', fontweight='bold')
-    plt.title('PyTorch MLP Parameter Sweep: Train vs Validation Error', fontsize=14, fontweight='bold')
-    plt.grid(True, which='both', linestyle='--', alpha=0.3)
-    plt.legend(fontsize=12)
-    plt.tight_layout()
+def plot_residuals(y_true, y_pred, save_path=None):
+    residuals = np.asarray(y_true) - np.asarray(y_pred)
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.scatter(y_pred, residuals, alpha=0.55, s=18)
+    ax.axhline(0, color="black", linestyle="--", linewidth=1.3)
+    ax.set_xlabel("Predicted target")
+    ax.set_ylabel("Residual (actual - predicted)")
+    ax.set_title("Residuals vs predicted values")
+    ax.grid(True, alpha=0.25)
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=160)
     plt.show()
