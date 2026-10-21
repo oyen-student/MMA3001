@@ -29,7 +29,7 @@ Run the full pipeline with Optuna tuning:
 python main.py --data "/path/to/DTMB5415-database.mat" --target-row 0 --trials 20
 ```
 
-Run a faster initial check without Optuna:
+Add `--sweep` to run an additional architecture comparison and save `architecture_sweep.csv` and `architecture_sweep.png`. This performs extra training and is optional.\n\nFor example, run tuning and the architecture sweep together:\n\n```bash\npython main.py --data "/path/to/DTMB5415-database.mat" --trials 20 --sweep\n```\n\nRun a faster initial check without Optuna:
 
 ```bash
 python main.py --data "/path/to/DTMB5415-database.mat" --target-row 0 --skip-tuning
@@ -42,7 +42,7 @@ The path is supplied on the command line instead of being hard-coded to a partic
 The output directory defaults to `outputs/` and contains:
 
 - `metrics.json`: validation and held-out test MSE, RMSE, MAE and (R^2), sample counts, selected configuration, and a flag noting that target-row semantics still require verification.
-- `training_validation_loss.png`: training and validation loss with best epoch marked.
+- `training_validation_loss.png`: training and validation loss with best epoch marked.\n- `architecture_sweep.csv` and `architecture_sweep.png`: actual training/validation errors for the optional architecture sweep.
 - `test_predictions.png`: held-out actual-versus-predicted plot.
 - `test_residuals.png`: held-out residual plot.
 - `optuna_convergence.png`: validation-objective search history (when tuning is enabled).
