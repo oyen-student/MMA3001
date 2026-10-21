@@ -184,3 +184,77 @@ def plot_residuals(y_true, y_pred, save_path=None):
     if save_path:
         fig.savefig(save_path, dpi=160)
     plt.show()
+
+
+
+def run_architecture_sweep(
+    X_train,
+    y_train_scaled,
+    X_val,
+    y_val_scaled,
+    y_scaler,
+    architectures=None,
+    epochs=100,
+    seed=42,
+):
+    """Compare architectures on validation MSE; does not inspect the test set."""
+    from sklearn.metrics import mean_squared_error
+
+    if architectures is None:
+        architectures = [
+            (32,), (64,), (128,),
+            (32, 32), (64, 32), (64, 64), (128, 64),
+            (32, 32, 32), (64, 32, 16), (128, 64, 32),
+        ]
+
+    y_val_original = y_scaler.inverse_transform(
+        np.asarray(y_val_scaled).reshape(-1, 1)
+    ).ravel()
+    rows = []
+    for index, architecture in enumerate(architectures):
+        model, history = train_optimized_mlp(
+            X_train, y_train_scaled, X_val, y_val_scaled,
+            hidden_sizes=architecture,
+            epochs=epochs,
+            patience=15,
+            seed=seed + index,
+        )
+        train_pred = evaluate_pytorch_model(model, X_train, y_scaler)
+        val_pred = evaluate_pytorch_model(model, X_val, y_scaler)
+        y_train_original = y_scaler.inverse_transform(
+            np.asarray(y_train_scaled).reshape(-1, 1)
+        ).ravel()
+        rows.append({
+            "architecture": tuple(architecture),
+            "Arch_Str": str(tuple(architecture)),
+            "train_mse": float(mean_squared_error(y_train_original, train_pred)),
+            "val_mse": float(mean_squared_error(y_val_original, val_pred)),
+            "best_epoch": history["best_epoch"],
+        })
+    return pd.DataFrame(rows).sort_values("val_mse").reset_index(drop=True)
+
+
+def plot_sweep_results(results_df, save_path=None):
+    """Plot actual architecture-sweep results (not manually entered values)."""
+    fig, ax = plt.subplots(figsize=(12, 6))
+    positions = np.arange(len(results_df))
+    width = 0.38
+    ax.bar(positions - width / 2, results_df["train_mse"], width, label="Training MSE")
+    ax.bar(positions + width / 2, results_df["val_mse"], width, label="Validation MSE")
+    ax.set_xticks(positions)
+    ax.set_xticklabels(results_df["Arch_Str"], rotation=45, ha="right")
+    positive = np.concatenate([
+        results_df["train_mse"].to_numpy(),
+        results_df["val_mse"].to_numpy(),
+    ])
+    if np.all(positive > 0):
+        ax.set_yscale("log")
+    ax.set_ylabel("MSE (original target units squared)")
+    ax.set_xlabel("Hidden-layer architecture")
+    ax.set_title("MLP architecture sweep: training vs validation error")
+    ax.grid(True, axis="y", alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=160)
+    plt.show()
