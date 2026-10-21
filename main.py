@@ -3,9 +3,6 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
-from sklearn.metrics import mean_squared_error
-
 from data_prep import load_and_preprocess_data
 from hyperparameter_tuning import run_bayesian_search, best_model_config, plot_optuna_convergence
 from linear_regression import MeanBaseline, train_linear_regression
@@ -22,8 +19,21 @@ from neural_network import (
 
 
 def main():
+    project_dir = Path(__file__).resolve().parent
+    default_data_path = (
+        project_dir / "data" / "dr-benchmark-5415hull" / "DTMB5415-database.mat"
+    )
+
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data", required=True, help="Path to DTMB5415-database.mat")
+    parser.add_argument(
+        "--data",
+        type=Path,
+        default=default_data_path,
+        help=(
+            "Path to DTMB5415-database.mat "
+            f"(default: {default_data_path})"
+        ),
+    )
     parser.add_argument(
         "--target-row", type=int, default=0,
         help="Row of coefStatMatrix to predict (DEFAULT 0 MUST be verified from dataset documentation).",
@@ -35,10 +45,21 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
+    if not args.data.is_file():
+        raise FileNotFoundError(
+            f"MATLAB dataset not found: {args.data}\n\n"
+            "Download the dataset from https://zenodo.org/records/19222008, "
+            "extract the archive, and move the entire 'dr-benchmark-5415hull' "
+            "folder into the repository's 'data' folder. The expected file path is:\n"
+            f"  {default_data_path}\n\n"
+            "If the file is stored elsewhere, pass its full path using --data."
+        )
+
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     data = load_and_preprocess_data(args.data, target_row=args.target_row, random_state=args.seed)
+    print(f"Dataset: {args.data.resolve()}")
     print(f"Samples: {data['n_samples']} | features: {data['n_features']}")
     print(f"Split sizes: {data['split_sizes']}")
     print(f"Target row: {data['target_row']} (verify its physical meaning in the dataset documentation)")
@@ -78,7 +99,6 @@ def main():
             "weight_decay": 1e-4,
             "batch_size": 64,
         }
-        history = None
         study = None
     else:
         study = run_bayesian_search(
