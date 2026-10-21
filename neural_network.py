@@ -4,6 +4,7 @@ import random
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -57,7 +58,11 @@ def train_optimized_mlp(
     X_train_t = torch.as_tensor(np.asarray(X_train), dtype=torch.float32)
     y_train_t = torch.as_tensor(np.asarray(y_train_scaled), dtype=torch.float32).reshape(-1, 1)
     X_val_t = torch.as_tensor(np.asarray(X_val), dtype=torch.float32, device=device)
-    y_val_t = torch.as_tensor(np.asarray(y_val_scaled), dtype=torch.float32, device=device)
+    y_val_t = torch.as_tensor(
+        np.asarray(y_val_scaled).reshape(-1, 1),
+        dtype=torch.float32,
+        device=device,
+    )
 
     loader = DataLoader(
         TensorDataset(X_train_t, y_train_t),
@@ -194,7 +199,8 @@ def run_architecture_sweep(
     y_val_scaled,
     y_scaler,
     architectures=None,
-    epochs=100,
+    epochs=500,
+    patience=50,
     seed=42,
 ):
     """Compare architectures on validation MSE; does not inspect the test set."""
@@ -216,7 +222,7 @@ def run_architecture_sweep(
             X_train, y_train_scaled, X_val, y_val_scaled,
             hidden_sizes=architecture,
             epochs=epochs,
-            patience=15,
+            patience=patience,
             seed=seed + index,
         )
         train_pred = evaluate_pytorch_model(model, X_train, y_scaler)

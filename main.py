@@ -39,11 +39,24 @@ def main():
         help="Row of coefStatMatrix to predict (DEFAULT 0 MUST be verified from dataset documentation).",
     )
     parser.add_argument("--trials", type=int, default=20, help="Number of Optuna trials.")
+    parser.add_argument(
+        "--epochs", type=int, default=500,
+        help="Maximum training epochs per model (early stopping may stop sooner).",
+    )
+    parser.add_argument(
+        "--patience", type=int, default=50,
+        help="Epochs without validation improvement before early stopping.",
+    )
     parser.add_argument("--skip-tuning", action="store_true", help="Use a fixed modest MLP instead of Optuna.")
     parser.add_argument("--sweep", action="store_true", help="Run an additional architecture sweep (extra compute).")
     parser.add_argument("--output-dir", default="outputs", help="Directory for plots and metrics JSON.")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+
+    if args.epochs < 1:
+        parser.error("--epochs must be at least 1.")
+    if args.patience < 1:
+        parser.error("--patience must be at least 1.")
 
     if not args.data.is_file():
         raise FileNotFoundError(
@@ -72,7 +85,8 @@ def main():
     if args.sweep:
         sweep_df = run_architecture_sweep(
             X_train, data["y_train_scaled"], X_val, data["y_val_scaled"],
-            data["y_scaler"], seed=args.seed,
+            data["y_scaler"], epochs=args.epochs, patience=args.patience,
+            seed=args.seed,
         )
         sweep_df.to_csv(output_dir / "architecture_sweep.csv", index=False)
         plot_sweep_results(sweep_df, output_dir / "architecture_sweep.png")
@@ -104,7 +118,8 @@ def main():
         study = run_bayesian_search(
             X_train, data["y_train_scaled"],
             X_val, data["y_val_scaled"], data["y_scaler"],
-            n_trials=args.trials, seed=args.seed,
+            n_trials=args.trials, max_epochs=args.epochs,
+            patience=args.patience, seed=args.seed,
         )
         config = best_model_config(study)
         print(f"Best Optuna validation MSE: {study.best_value:.6g}")
@@ -118,8 +133,8 @@ def main():
         lr=config["lr"],
         weight_decay=config["weight_decay"],
         batch_size=config["batch_size"],
-        epochs=200,
-        patience=22,
+        epochs=args.epochs,
+        patience=args.patience,
         seed=args.seed,
     )
     plot_training_history(history, output_dir / "training_validation_loss.png")

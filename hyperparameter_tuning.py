@@ -12,7 +12,8 @@ def run_bayesian_search(
     y_val_scaled,
     y_scaler,
     n_trials=20,
-    max_epochs=160,
+    max_epochs=500,
+    patience=50,
     seed=42,
 ):
     """Tune architecture and learning rate using validation MSE in original units."""
@@ -35,7 +36,7 @@ def run_bayesian_search(
             batch_size=batch_size,
             lr=lr,
             weight_decay=weight_decay,
-            patience=18,
+            patience=patience,
             seed=seed,
         )
         pred = evaluate_pytorch_model(model, X_val, y_scaler)

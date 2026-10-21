@@ -60,6 +60,12 @@ Once the dataset is in the location above, the program finds it automatically. R
 python main.py --target-row 0 --trials 20
 ```
 
+Training uses a maximum of 500 epochs per model and stops early if validation loss does not improve for 50 consecutive epochs. Adjust these limits with `--epochs` and `--patience`; for example:
+
+```bash
+python main.py --target-row 0 --trials 20 --epochs 1000 --patience 100
+```
+
 Add `--sweep` to run an additional architecture comparison and save `architecture_sweep.csv` and `architecture_sweep.png`. This performs extra training and is optional:
 
 ```bash
