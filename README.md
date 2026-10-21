@@ -8,7 +8,7 @@ This repository compares simple regression baselines with a PyTorch multilayer p
 
 - `data_prep.py`: validates MAT-file keys/shapes and finite values; creates reproducible train/validation/test splits; fits feature and target standardisers on training data only.
 - `linear_regression.py`: mean-target sanity baseline and linear-regression baseline.
-- `neural_network.py`: PyTorch MLP, reproducible training, validation-loss tracking, early stopping, best-checkpoint restoration, regression metrics, and diagnostic plots.
+- `neural_network.py`: PyTorch MLP, reproducible training, post-epoch train/validation loss measured in evaluation mode, configurable gradient clipping, pre-clipping gradient-norm diagnostics, early stopping, best-checkpoint restoration, regression metrics, and diagnostic plots.
 - `hyperparameter_tuning.py`: Optuna TPE search over MLP architecture, learning rate, weight decay, and batch size using validation MSE in original target units.
 - `main.py`: complete experiment, held-out test evaluation, and output saving.
 - `requirements.txt`: Python dependencies.
@@ -60,10 +60,10 @@ Once the dataset is in the location above, the program finds it automatically. R
 python main.py --target-row 0 --trials 20
 ```
 
-Training uses a maximum of 500 epochs per model and stops early if validation loss does not improve for 50 consecutive epochs. Adjust these limits with `--epochs` and `--patience`; for example:
+Training uses a maximum of 500 epochs per model and stops early if validation loss does not improve by at least `--min-delta` for 50 consecutive epochs. Gradient clipping defaults to a global norm of 1.0; set `--grad-clip 0` to disable clipping. These are experimental stability controls, not a guarantee that training will be stable. Adjust them with `--epochs`, `--patience`, `--min-delta`, and `--grad-clip`; for example:
 
 ```bash
-python main.py --target-row 0 --trials 20 --epochs 1000 --patience 100
+python main.py --target-row 0 --trials 20 --epochs 1000 --patience 100 --min-delta 1e-6 --grad-clip 1.0
 ```
 
 Add `--sweep` to run an additional architecture comparison and save `architecture_sweep.csv` and `architecture_sweep.png`. This performs extra training and is optional:
@@ -111,7 +111,8 @@ Replace the example path with the actual location of `DTMB5415-database.mat` in 
 The output directory defaults to `outputs/` and contains:
 
 - `metrics.json`: validation and held-out test MSE, RMSE, MAE and (R²), sample counts, selected configuration, and a flag noting that target-row semantics still require verification.
-- `training_validation_loss.png`: training and validation loss with best epoch marked.
+- `training_validation_loss.png`: training and validation loss measured after each epoch's updates, with best epoch marked.
+- `gradient_norms.png`: mean and maximum minibatch gradient norms before clipping, to help diagnose unstable optimisation.
 - `architecture_sweep.csv` and `architecture_sweep.png`: actual training/validation errors for the optional architecture sweep.
 - `test_predictions.png`: held-out actual-versus-predicted plot.
 - `test_residuals.png`: held-out residual plot.
@@ -122,9 +123,11 @@ The output directory defaults to `outputs/` and contains:
 1. **No preprocessing leakage:** feature and target scalers are fitted on the training split only.
 2. **Validation for model selection:** validation data is used for early stopping and Optuna selection; it is not used as the final performance estimate.
 3. **Held-out test:** the test split is evaluated after model selection. Do not use test results to choose the architecture or tune hyperparameters.
-4. **Consistent metrics:** model comparisons use MSE, RMSE, MAE and (R²), all calculated in the target's original units.
-5. **Reproducibility:** the train/validation/test split and PyTorch/Optuna sampling use fixed seeds by default.
-6. **Interpretation limits:** random splitting assumes samples can be treated as independent draws. If hulls are related variants or grouped designs, consider a group-aware split to test generalisation to genuinely unseen hull families.
+4. **Comparable loss curves:** training and validation losses are both measured after epoch updates with the model in evaluation mode.
+5. **Gradient diagnostics:** gradient norms are recorded before clipping; clipping can reduce extreme updates but does not diagnose or eliminate data issues.
+6. **Consistent metrics:** model comparisons use MSE, RMSE, MAE and (R²), all calculated in the target's original units.
+7. **Reproducibility:** the train/validation/test split and PyTorch/Optuna sampling use fixed seeds by default.
+8. **Interpretation limits:** random splitting assumes samples can be treated as independent draws. If hulls are related variants or grouped designs, consider a group-aware split to test generalisation to genuinely unseen hull families.
 
 ## Before writing conclusions
 
