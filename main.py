@@ -16,6 +16,8 @@ from neural_network import (
     plot_training_history,
     plot_predictions,
     plot_residuals,
+    run_architecture_sweep,
+    plot_sweep_results,
 )
 
 
