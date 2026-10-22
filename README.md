@@ -94,6 +94,14 @@ python main.py --target-row 0 --skip-tuning
 
 **Neither the architecture sweep nor Optuna uses the held-out test partition to choose configurations.** Both use validation results. The held-out test set is evaluated afterward for final reporting; do not use its metrics to pick between sweep, Optuna, or fixed-model results.
 
+### Runtime reporting and reducing run time
+
+Each run prints elapsed wall-clock time for data loading/preprocessing, the optional architecture sweep, baseline fitting and validation, Optuna search, the final MLP fit, held-out evaluation, diagnostic plots, metrics-file writing, and the complete run. `metrics.json` records the stage timings up to the start of its own write. When a sweep runs, each architecture's training time is included in `architecture_sweep.csv`; during Optuna, each completed trial prints its validation score and runtime, and per-trial times are recorded in `metrics.json`.
+
+Optuna's objective uses the best validation MSE already measured during training. Since the target was standardized, multiplying that scaled MSE by the square of the training target scaler's scale gives the same MSE in original target units. This avoids a separate validation prediction pass for every trial while preserving the objective used to rank configurations.
+
+The largest practical runtime reduction is to avoid stacking the ten-architecture sweep on top of Optuna: use Optuna alone for general tuning, and run the sweep when a fixed architecture comparison is useful. For a faster exploratory run, request fewer trials or a lower epoch cap (for example, `--trials 5 --epochs 150`); early stopping may shorten individual fits further. Record these settings when comparing experiments, since reducing search or training budgets can change which configuration is selected and how well it is optimized.
+
 ### Using a different dataset location
 
 If you have stored the extracted folder somewhere else, pass the full path to the MAT file with `--data`:
@@ -153,6 +161,7 @@ The output directory defaults to `outputs/` and contains:
 - `test_model_comparison.png`: linear-regression and MLP predictions on the same held-out actual-versus-predicted plot, with R-squared and RMSE in the legend.
 - `test_residuals.png`: held-out residual plot.
 - `optuna_convergence.png`: validation-objective search history (when tuning is enabled).
+- Runtime details: stage timings are printed in the terminal; `metrics.json` records stage timings through the start of its own write and the elapsed time for each Optuna trial.
 
 ## Methodological safeguards
 

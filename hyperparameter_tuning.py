@@ -1,9 +1,10 @@
 """Optuna search using the same PyTorch model and validation procedure."""
-import optuna
 import math
+from time import perf_counter
 
-from neural_network import train_optimized_mlp, evaluate_pytorch_model
-from sklearn.metrics import mean_squared_error
+import optuna
+
+from neural_network import train_optimized_mlp
 
 
 def run_bayesian_search(
@@ -57,6 +58,7 @@ def run_bayesian_search(
         Returns:
             Validation MSE calculated in the target's original units.
         """
+        trial_started = perf_counter()
         n_layers = trial.suggest_int("n_layers", 1, 3)
         hidden_sizes = tuple(
             trial.suggest_categorical(f"width_{i}", [32, 64, 96, 128])
@@ -66,7 +68,7 @@ def run_bayesian_search(
         weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
         batch_size = trial.suggest_categorical("batch_size", [32, 64, 128])
 
-        model, history = train_optimized_mlp(
+        _, history = train_optimized_mlp(
             X_train, y_train_scaled, X_val, y_val_scaled,
             hidden_sizes=hidden_sizes,
             epochs=max_epochs,
@@ -78,11 +80,21 @@ def run_bayesian_search(
             grad_clip=grad_clip,
             seed=seed,
         )
-        pred = evaluate_pytorch_model(model, X_val, y_scaler)
-        y_val_original = y_scaler.inverse_transform(y_val_scaled.reshape(-1, 1)).ravel()
         trial.set_user_attr("hidden_sizes", list(hidden_sizes))
         trial.set_user_attr("best_epoch", history["best_epoch"])
-        return mean_squared_error(y_val_original, pred)
+        trial_runtime = perf_counter() - trial_started
+        trial.set_user_attr("runtime_seconds", trial_runtime)
+
+        # StandardScaler maps y to (y - mean) / scale, so MSE in original
+        # units is scaled-target MSE multiplied by scale squared. Reusing the
+        # restored best epoch's validation loss avoids another model pass over
+        # the validation set for every trial.
+        validation_mse = history["best_val_loss_scaled"] * float(y_scaler.scale_[0]) ** 2
+        print(
+            f"Optuna trial {trial.number + 1}/{n_trials}: "
+            f"validation MSE={validation_mse:.6g}, runtime={trial_runtime:.2f} s"
+        )
+        return validation_mse
 
     sampler = optuna.samplers.TPESampler(seed=seed)
     study = optuna.create_study(direction="minimize", sampler=sampler)

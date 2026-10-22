@@ -4,6 +4,7 @@ import json
 import math
 from pathlib import Path
 import sys
+from time import perf_counter
 
 from data_prep import load_and_preprocess_data
 from hyperparameter_tuning import run_bayesian_search, best_model_config, plot_optuna_convergence
@@ -20,6 +21,14 @@ from neural_network import (
     run_architecture_sweep,
     plot_sweep_results,
 )
+
+
+def _finish_stage(name, started_at, timings):
+    """Record and print elapsed wall-clock time for one pipeline stage."""
+    elapsed = perf_counter() - started_at
+    timings[name] = elapsed
+    print(f"Runtime — {name.replace('_', ' ')}: {elapsed:.2f} s")
+    return elapsed
 
 
 def main():
@@ -75,6 +84,8 @@ def main():
     parser.add_argument("--output-dir", default="outputs", help="Directory for plots and metrics JSON.")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    pipeline_started = perf_counter()
+    timings = {}
 
     if args.epochs < 1:
         parser.error("--epochs must be at least 1.")
@@ -98,10 +109,14 @@ def main():
             "If the file is stored elsewhere, pass its full path using --data."
         )
 
+    stage_started = perf_counter()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    _finish_stage("output_directory_setup", stage_started, timings)
 
+    stage_started = perf_counter()
     data = load_and_preprocess_data(args.data, target_row=args.target_row, random_state=args.seed)
+    _finish_stage("data_loading_and_preprocessing", stage_started, timings)
     print(f"Dataset: {args.data.resolve()}")
     print(f"Samples: {data['n_samples']} | features: {data['n_features']}")
     print(f"Split sizes: {data['split_sizes']}")
@@ -121,6 +136,7 @@ def main():
 
     # Optional architecture sweep: select by validation performance only.
     if args.sweep:
+        stage_started = perf_counter()
         sweep_df = run_architecture_sweep(
             X_train, data["y_train_scaled"], X_val, data["y_val_scaled"],
             data["y_scaler"], epochs=args.epochs, patience=args.patience,
@@ -129,22 +145,35 @@ def main():
         sweep_df.to_csv(output_dir / "architecture_sweep.csv", index=False)
         plot_sweep_results(sweep_df, output_dir / "architecture_sweep.png")
         print("Best sweep architecture:", sweep_df.iloc[0]["architecture"])
+        _finish_stage("architecture_sweep_and_outputs", stage_started, timings)
+    else:
+        timings["architecture_sweep_and_outputs"] = 0.0
+        print("Runtime — architecture sweep: skipped")
 
     # Baselines: constant mean and linear regression.
-    baselines = {
-        "Mean baseline": MeanBaseline().fit(X_train, y_train),
-        "Linear regression": train_linear_regression(X_train, y_train),
-    }
+    baselines = {}
     results = {}
-    for name, model in baselines.items():
+    baseline_factories = (
+        ("Mean baseline", lambda: MeanBaseline().fit(X_train, y_train)),
+        ("Linear regression", lambda: train_linear_regression(X_train, y_train)),
+    )
+    for name, fit_model in baseline_factories:
+        stage_started = perf_counter()
+        model = fit_model()
+        baselines[name] = model
         val_pred = model.predict(X_val)
         results[name] = {
             "validation": regression_metrics(y_val, val_pred),
             "test": None,
         }
         print(f"{name} validation: {results[name]['validation']}")
+        stage_key = name.lower().replace(" ", "_")
+        _finish_stage(f"{stage_key}_fit_and_validation", stage_started, timings)
 
     if args.skip_tuning:
+        timings["optuna_search"] = 0.0
+        timings["optuna_convergence_plot"] = 0.0
+        print("Runtime — Optuna search: skipped")
         config = {
             "hidden_sizes": (64, 32),
             "lr": 1e-3,
@@ -153,6 +182,7 @@ def main():
         }
         study = None
     else:
+        stage_started = perf_counter()
         study = run_bayesian_search(
             X_train, data["y_train_scaled"],
             X_val, data["y_val_scaled"], data["y_scaler"],
@@ -160,11 +190,15 @@ def main():
             patience=args.patience, min_delta=args.min_delta,
             grad_clip=grad_clip, seed=args.seed,
         )
+        _finish_stage("optuna_search", stage_started, timings)
         config = best_model_config(study)
         print(f"Best Optuna validation MSE: {study.best_value:.6g}")
         print(f"Best configuration: {config}")
+        stage_started = perf_counter()
         plot_optuna_convergence(study, output_dir / "optuna_convergence.png")
+        _finish_stage("optuna_convergence_plot", stage_started, timings)
 
+    stage_started = perf_counter()
     model, history = train_optimized_mlp(
         X_train, data["y_train_scaled"],
         X_val, data["y_val_scaled"],
@@ -178,10 +212,15 @@ def main():
         grad_clip=grad_clip,
         seed=args.seed,
     )
+    _finish_stage("final_mlp_training", stage_started, timings)
+
+    stage_started = perf_counter()
     plot_training_history(history, output_dir / "training_validation_loss.png")
     plot_gradient_norms(history, output_dir / "gradient_norms.png")
+    _finish_stage("training_diagnostic_plots", stage_started, timings)
 
     # Keep test data out of model selection; evaluate each final model here.
+    stage_started = perf_counter()
     test_predictions = {}
     for name, baseline in baselines.items():
         test_predictions[name] = baseline.predict(X_test)
@@ -202,11 +241,13 @@ def main():
             "best_epoch": history["best_epoch"],
         },
     }
+    _finish_stage("held_out_evaluation_and_metrics", stage_started, timings)
 
     print("\nFINAL HELD-OUT TEST RESULTS")
     for name, metrics in results.items():
         print(f"{name}: {metrics['test']}")
 
+    stage_started = perf_counter()
     plot_predictions(y_test, mlp_test_pred, "MLP: held-out test predictions", output_dir / "test_predictions.png")
     plot_model_comparison(
         y_test,
@@ -217,7 +258,11 @@ def main():
         output_dir / "test_model_comparison.png",
     )
     plot_residuals(y_test, mlp_test_pred, output_dir / "test_residuals.png")
+    _finish_stage("test_diagnostic_plots", stage_started, timings)
 
+    # JSON serialization time is reported in the terminal after saving; the
+    # JSON records elapsed runtime up to the start of its own write.
+    timings["elapsed_before_metrics_json_write"] = perf_counter() - pipeline_started
     with (output_dir / "metrics.json").open("w", encoding="utf-8") as f:
         json.dump(
             {
@@ -249,12 +294,19 @@ def main():
                     "grad_clip": grad_clip,
                     "architecture_sweep": args.sweep,
                 },
+                "runtime_seconds": timings,
+                "optuna_trial_runtime_seconds": (
+                    [trial.user_attrs.get("runtime_seconds") for trial in study.trials]
+                    if study else []
+                ),
                 "results": results,
             },
             f, indent=2,
         )
+    metrics_write_seconds = perf_counter() - (pipeline_started + timings["elapsed_before_metrics_json_write"])
     print(f"\nSaved plots and metrics to: {output_dir.resolve()}")
-    print("Interpret results within the sampled dataset and random split; hull-family generalization has not been established.")
+    print(f"Runtime — metrics JSON write: {metrics_write_seconds:.2f} s")
+    print(f"Runtime — total: {perf_counter() - pipeline_started:.2f} s")
 
 
 if __name__ == "__main__":

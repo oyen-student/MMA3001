@@ -1,6 +1,7 @@
 """PyTorch MLP regression, early stopping, and evaluation plots."""
 from copy import deepcopy
 import random
+from time import perf_counter
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -394,12 +395,14 @@ def run_architecture_sweep(
             (32, 32), (64, 32), (64, 64), (128, 64),
             (32, 32, 32), (64, 32, 16), (128, 64, 32),
         ]
+    architectures = list(architectures)
 
     y_val_original = y_scaler.inverse_transform(
         np.asarray(y_val_scaled).reshape(-1, 1)
     ).ravel()
     rows = []
     for index, architecture in enumerate(architectures):
+        architecture_started = perf_counter()
         model, history = train_optimized_mlp(
             X_train, y_train_scaled, X_val, y_val_scaled,
             hidden_sizes=architecture,
@@ -420,7 +423,13 @@ def run_architecture_sweep(
             "train_mse": float(mean_squared_error(y_train_original, train_pred)),
             "val_mse": float(mean_squared_error(y_val_original, val_pred)),
             "best_epoch": history["best_epoch"],
+            "runtime_seconds": perf_counter() - architecture_started,
         })
+        print(
+            f"Architecture {index + 1}/{len(architectures)} {tuple(architecture)}: "
+            f"validation MSE={rows[-1]['val_mse']:.6g}, "
+            f"runtime={rows[-1]['runtime_seconds']:.2f} s"
+        )
     return pd.DataFrame(rows).sort_values("val_mse").reset_index(drop=True)
 
 
