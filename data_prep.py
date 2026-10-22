@@ -12,6 +12,30 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 
+# The archive's metadata.txt numbers rows from one. Python's target_row is
+# zero-based, so row 0 below corresponds to metadata row 1.
+TARGET_ROW_DEFINITIONS = {
+    0: {
+        "quantity": "Wave resistance coefficient (Cw)",
+        "froude_number": 0.25,
+        "scale": "model scale",
+        "source": "DTMB5415 dataset metadata.txt (included with the dataset archive)",
+    },
+    1: {
+        "quantity": "Wave resistance coefficient (Cw)",
+        "froude_number": 0.33,
+        "scale": "model scale",
+        "source": "DTMB5415 dataset metadata.txt (included with the dataset archive)",
+    },
+    2: {
+        "quantity": "Wave resistance coefficient (Cw)",
+        "froude_number": 0.41,
+        "scale": "model scale",
+        "source": "DTMB5415 dataset metadata.txt (included with the dataset archive)",
+    },
+}
+
+
 def load_and_preprocess_data(
     mat_file_path,
     target_row=0,
@@ -96,6 +120,33 @@ def load_and_preprocess_data(
     X_train, X_val, X_test = X[train_idx], X[val_idx], X[test_idx]
     y_train, y_val, y_test = y[train_idx], y[val_idx], y[test_idx]
 
+    # Audit exact duplicate design vectors without using target values. This
+    # reports whether random splitting placed an identical design in multiple
+    # partitions; it does not define a near-duplicate tolerance or group hulls.
+    split_by_sample = np.empty(len(y), dtype=object)
+    split_by_sample[train_idx] = "train"
+    split_by_sample[val_idx] = "validation"
+    split_by_sample[test_idx] = "test"
+    _, duplicate_inverse, duplicate_counts = np.unique(
+        X, axis=0, return_inverse=True, return_counts=True
+    )
+    duplicate_group_indices = np.flatnonzero(duplicate_counts > 1)
+    cross_split_duplicate_groups = 0
+    cross_split_duplicate_samples = 0
+    for group_index in duplicate_group_indices:
+        members = np.flatnonzero(duplicate_inverse == group_index)
+        if np.unique(split_by_sample[members]).size > 1:
+            cross_split_duplicate_groups += 1
+            cross_split_duplicate_samples += len(members)
+    duplicate_audit = {
+        "method": "exact equality of normalized design-variable rows",
+        "duplicate_groups": int(len(duplicate_group_indices)),
+        "samples_in_duplicate_groups": int(duplicate_counts[duplicate_counts > 1].sum()),
+        "duplicate_groups_crossing_splits": int(cross_split_duplicate_groups),
+        "samples_in_cross_split_duplicate_groups": int(cross_split_duplicate_samples),
+        "near_duplicates_audited": False,
+    }
+
     # Fit preprocessing on training data only.
     x_scaler = StandardScaler().fit(X_train)
     y_scaler = StandardScaler().fit(y_train.reshape(-1, 1))
@@ -121,6 +172,7 @@ def load_and_preprocess_data(
         "y_scaler": y_scaler,
         "feature_names": feature_names,
         "target_row": target_row,
+        "target_definition": TARGET_ROW_DEFINITIONS.get(target_row),
         "n_samples": len(y),
         "n_features": X.shape[1],
         "split_sizes": {
@@ -128,4 +180,5 @@ def load_and_preprocess_data(
             "validation": len(val_idx),
             "test": len(test_idx),
         },
+        "duplicate_audit": duplicate_audit,
     }

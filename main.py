@@ -1,7 +1,9 @@
 """Run baseline comparisons, optional Optuna tuning, and final test evaluation."""
 import argparse
 import json
+import math
 from pathlib import Path
+import sys
 
 from data_prep import load_and_preprocess_data
 from hyperparameter_tuning import run_bayesian_search, best_model_config, plot_optuna_convergence
@@ -12,6 +14,7 @@ from neural_network import (
     regression_metrics,
     plot_training_history,
     plot_predictions,
+    plot_model_comparison,
     plot_residuals,
     plot_gradient_norms,
     run_architecture_sweep,
@@ -48,7 +51,7 @@ def main():
     )
     parser.add_argument(
         "--target-row", type=int, default=0,
-        help="Row of coefStatMatrix to predict (DEFAULT 0 MUST be verified from dataset documentation).",
+        help="Zero-based row of coefStatMatrix (0=wave resistance Cw at Fr=0.25 per included dataset metadata).",
     )
     parser.add_argument("--trials", type=int, default=20, help="Number of Optuna trials.")
     parser.add_argument(
@@ -77,10 +80,12 @@ def main():
         parser.error("--epochs must be at least 1.")
     if args.patience < 1:
         parser.error("--patience must be at least 1.")
-    if args.min_delta < 0:
-        parser.error("--min-delta must be non-negative.")
-    if args.grad_clip < 0:
-        parser.error("--grad-clip must be non-negative.")
+    if args.trials < 1:
+        parser.error("--trials must be at least 1.")
+    if not math.isfinite(args.min_delta) or args.min_delta < 0:
+        parser.error("--min-delta must be finite and non-negative.")
+    if not math.isfinite(args.grad_clip) or args.grad_clip < 0:
+        parser.error("--grad-clip must be finite and non-negative.")
     grad_clip = args.grad_clip if args.grad_clip > 0 else None
 
     if not args.data.is_file():
@@ -100,7 +105,15 @@ def main():
     print(f"Dataset: {args.data.resolve()}")
     print(f"Samples: {data['n_samples']} | features: {data['n_features']}")
     print(f"Split sizes: {data['split_sizes']}")
-    print(f"Target row: {data['target_row']} (verify its physical meaning in the dataset documentation)")
+    target_definition = data["target_definition"]
+    if target_definition:
+        print(
+            f"Target row: {data['target_row']} ({target_definition['quantity']}, "
+            f"Fr={target_definition['froude_number']:.2f}, {target_definition['scale']}; "
+            "per included dataset metadata)"
+        )
+    else:
+        print(f"Target row: {data['target_row']} (no definition recorded in local dataset metadata)")
     print("All reported metrics below are in the original target units.")
 
     X_train, X_val, X_test = data["X_train"], data["X_val"], data["X_test"]
@@ -169,10 +182,14 @@ def main():
     plot_gradient_norms(history, output_dir / "gradient_norms.png")
 
     # Keep test data out of model selection; evaluate each final model here.
+    test_predictions = {}
     for name, baseline in baselines.items():
-        results[name]["test"] = regression_metrics(y_test, baseline.predict(X_test))
+        test_predictions[name] = baseline.predict(X_test)
+        results[name]["test"] = regression_metrics(y_test, test_predictions[name])
     mlp_test_pred = evaluate_pytorch_model(model, X_test, data["y_scaler"])
-    results["Tuned PyTorch MLP" if study else "Fixed PyTorch MLP"] = {
+    mlp_name = "Tuned PyTorch MLP" if study else "Fixed PyTorch MLP"
+    test_predictions[mlp_name] = mlp_test_pred
+    results[mlp_name] = {
         "validation": regression_metrics(
             y_val, evaluate_pytorch_model(model, X_val, data["y_scaler"])
         ),
@@ -191,23 +208,53 @@ def main():
         print(f"{name}: {metrics['test']}")
 
     plot_predictions(y_test, mlp_test_pred, "MLP: held-out test predictions", output_dir / "test_predictions.png")
+    plot_model_comparison(
+        y_test,
+        {
+            "Linear regression": test_predictions["Linear regression"],
+            mlp_name: mlp_test_pred,
+        },
+        output_dir / "test_model_comparison.png",
+    )
     plot_residuals(y_test, mlp_test_pred, output_dir / "test_residuals.png")
 
     with (output_dir / "metrics.json").open("w", encoding="utf-8") as f:
         json.dump(
             {
+                "data_path": str(args.data.resolve()),
+                "output_dir": str(output_dir.resolve()),
+                "command": [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]],
+                "python_version": sys.version.split()[0],
                 "target_row": data["target_row"],
-                "target_row_definition_verified": False,
+                "target_definition": target_definition,
+                "target_row_definition_verified": target_definition is not None,
+                "split_method": "random sample-level split",
+                "split_fractions": {
+                    "train": 0.70,
+                    "validation": 0.10,
+                    "test": 0.20,
+                },
+                "seed": args.seed,
                 "n_samples": data["n_samples"],
                 "n_features": data["n_features"],
                 "split_sizes": data["split_sizes"],
+                "duplicate_audit": data["duplicate_audit"],
                 "optuna_trials": len(study.trials) if study else 0,
+                "training_settings": {
+                    "skip_tuning": args.skip_tuning,
+                    "trials_requested": None if args.skip_tuning else args.trials,
+                    "max_epochs": args.epochs,
+                    "patience": args.patience,
+                    "min_delta": args.min_delta,
+                    "grad_clip": grad_clip,
+                    "architecture_sweep": args.sweep,
+                },
                 "results": results,
             },
             f, indent=2,
         )
     print(f"\nSaved plots and metrics to: {output_dir.resolve()}")
-    print("Reminder: confirm coefStatMatrix row definitions before interpreting this as wave-resistance prediction.")
+    print("Interpret results within the sampled dataset and random split; hull-family generalization has not been established.")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 """Optuna search using the same PyTorch model and validation procedure."""
 import optuna
+import math
 
 from neural_network import train_optimized_mlp, evaluate_pytorch_model
 from sklearn.metrics import mean_squared_error
@@ -36,6 +37,15 @@ def run_bayesian_search(
     Returns:
         optuna.Study: Completed study; inspect study.best_trial for its winner.
     """
+    if n_trials < 1:
+        raise ValueError("n_trials must be at least 1.")
+    if max_epochs < 1:
+        raise ValueError("max_epochs must be at least 1.")
+    if patience < 1:
+        raise ValueError("patience must be at least 1.")
+    if not math.isfinite(min_delta) or min_delta < 0:
+        raise ValueError("min_delta must be finite and non-negative.")
+
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     def objective(trial):

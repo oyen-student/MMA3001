@@ -38,7 +38,7 @@ Dataset facts from prior inspection:
 
 MATLAB arrays are stored with features/fields in rows and samples in columns. Check the loader and actual file keys before changing orientation assumptions.
 
-**Target-row caveat:** `--target-row 0` has been used as a compatibility/default choice, but its physical identity has not been verified from authoritative dataset metadata in this project context. Do not label it as a particular resistance coefficient (e.g. wave resistance or (C_w)) unless code/metadata establishes that mapping. Document the chosen row and its limitations.
+**Target-row mapping:** The local archive's `metadata.txt` maps one-based `coefStatMatrix` rows 1, 2, and 3 to model-scale wave-resistance coefficient (`Cw`) at Fr=0.25, 0.33, and 0.41. Python `--target-row 0` therefore selects row 1 / Fr=0.25. `data_prep.py` records this mapping and source in results. Cite that archive metadata and seek publication-level corroboration when a report requires independent confirmation. Do not claim the individual normalized design variables have known physical meanings unless separate documentation establishes them.
 
 ## Modelling and evaluation expectations
 
@@ -77,7 +77,7 @@ The testing branch was created from `experiment/stable-mlp-training` and receive
 - a correction to a malformed docstring in `neural_network.py`,
 - README test/CI instructions.
 
-**Important: these tests and the CI workflow were added but have not been confirmed to pass.** A previous workflow lookup returned no runs; that is not evidence of a pass or a failure. Inspect and run them. In particular, check that the tests' assumed metric keys, preprocessing return values, CLI arguments, data split logic, and plot filenames match the actual implementation. Fix tests or implementation based on evidence rather than forcing code to match unsupported assumptions.
+The synthetic suite passed locally on the user's Anaconda Python 3.12.14 with 21 tests on 2026-10-22. The no-write syntax scan also passed. CI workflow success still needs to be checked independently. Re-run pytest after any code/test change. In particular, make sure synthetic tests do not get presented as validation against the full real dataset.
 
 ## Local Windows / Python environment
 
@@ -93,7 +93,7 @@ Example commands from the repository root:
 ```powershell
 & "C:\Users\Orlando\anaconda3\python.exe" --version
 & "C:\Users\Orlando\anaconda3\python.exe" -m pip install -r requirements-dev.txt
-& "C:\Users\Orlando\anaconda3\python.exe" -m compileall -q .
+& "C:\Users\Orlando\anaconda3\python.exe" -B check_syntax.py
 & "C:\Users\Orlando\anaconda3\python.exe" -m pytest -q
 ```
 
@@ -133,6 +133,10 @@ This requires the dataset to be downloaded into the expected data directory. Che
 - Is still getting familiar with VS Code's interpreter, Git branch, and sync behaviour. Give explicit PowerShell commands and state which folder they should be run from.
 - Be careful with spelling of branch name: `fix-ml-pipline` was how the user previously referred to one branch, but verify actual remote branch names instead of assuming.
 
-## Immediate recommended next task
+## Current project caveats
 
-Inspect `test/pytest-pipeline` and run its tests. Verify `tests/test_pipeline.py` against `data_prep.py`, `neural_network.py`, `main.py`, and current output filenames. Fix any genuine incompatibilities, run the tests with the user's Anaconda Python if possible, and report the actual outcome. Do not report a passing suite until it has passed.
+- `data/train.csv`, `data/val.csv`, and `data/test.csv` are legacy artifacts with undocumented provenance. The active CLI does not read them; do not treat them as experiment evidence.
+- `src/data_prep.py` is a deprecated compatibility wrapper around the project-root loader. It must never synthesize fallback/random data.
+- The current split is random and sample-level. Metrics include an exact duplicate design-vector audit across splits. Near-duplicates are not measured because no tolerance is justified, and no hull-family labels are available for a group-aware split.
+- Saved output folders may represent different runs. Treat them as historical artifacts unless a run record documents command, seed, target, split, tuning settings, environment, and output location.
+- Before report conclusions, independently verify the archive metadata if needed, audit split relationships, run on the real MAT file, and check the GitHub Actions result.

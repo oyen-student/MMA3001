@@ -295,6 +295,40 @@ def plot_predictions(y_true, y_pred, title="Predicted vs actual", save_path=None
     plt.show()
 
 
+def plot_model_comparison(y_true, predictions, save_path=None):
+    """Compare model predictions against actual targets on the same axes.
+
+    Args:
+        y_true: Actual target values in original units.
+        predictions: Mapping of model names to predictions in original units.
+        save_path: Optional path at which to save the figure.
+    """
+    actual = np.asarray(y_true)
+    all_values = np.concatenate([actual, *(np.asarray(pred) for pred in predictions.values())])
+    lo = float(np.min(all_values))
+    hi = float(np.max(all_values))
+    fig, ax = plt.subplots(figsize=(8, 7))
+    for name, y_pred in predictions.items():
+        metrics = regression_metrics(actual, y_pred)
+        ax.scatter(
+            actual,
+            y_pred,
+            alpha=0.5,
+            s=20,
+            label=f"{name} (R²={metrics['R2']:.3f}, RMSE={metrics['RMSE']:.3g})",
+        )
+    ax.plot([lo, hi], [lo, hi], "k--", linewidth=1.5, label="Perfect predictions")
+    ax.set_xlabel("Actual target")
+    ax.set_ylabel("Predicted target")
+    ax.set_title("Linear regression vs MLP: held-out test predictions")
+    ax.grid(True, alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=160)
+    plt.show()
+
+
 def plot_residuals(y_true, y_pred, save_path=None):
     """Plot residuals against predictions, with a horizontal zero reference.
 

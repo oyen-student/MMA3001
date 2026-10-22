@@ -1,9 +1,11 @@
 
-import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+import numpy as np
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import optuna
+
+# Legacy plotting helpers retained for notebooks. The active CLI uses the
+# plotting functions in neural_network.py; keep these labels target-agnostic.
 
 def plot_predictions(y_true, y_pred, title):
     mse = mean_squared_error(y_true, y_pred)
@@ -11,12 +13,12 @@ def plot_predictions(y_true, y_pred, title):
     r2 = r2_score(y_true, y_pred)
 
     plt.figure(figsize=(8, 6))
-    sns.scatterplot(x=y_true, y=y_pred, alpha=0.4, color='darkslateblue', s=15)
+    plt.scatter(y_true, y_pred, alpha=0.4, color='darkslateblue', s=15)
     min_val, max_val = min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())
     plt.plot([min_val, max_val], [min_val, max_val], 'r--', lw=2)
     plt.title(title, fontsize=12, fontweight='bold')
-    plt.xlabel('Actual C_w')
-    plt.ylabel('Predicted C_w')
+    plt.xlabel('Actual target')
+    plt.ylabel('Predicted target')
     plt.grid(True, linestyle='--', alpha=0.5)
     text_str = f'MSE: {mse:.4e}\nMAE: {mae:.4e}\nR²: {r2:.4f}'
     plt.gca().text(0.05, 0.95, text_str, transform=plt.gca().transAxes, fontsize=10,
