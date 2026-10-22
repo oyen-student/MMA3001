@@ -21,20 +21,20 @@ def run_bayesian_search(
     """Search MLP hyperparameters using validation MSE in original target units.
 
     Args:
-        X_train: Training features scaled using training-only statistics.
-        y_train_scaled: Scaled training targets.
-        X_val: Validation features transformed using the training feature scaler.
-        y_val_scaled: Validation targets transformed using the training target scaler.
-        y_scaler: Fitted target scaler used to calculate metrics in original units.
-        n_trials: Number of Optuna configurations to evaluate.
-        max_epochs: Maximum training epochs per trial.
-        patience: Early-stopping patience per trial.
-        min_delta: Minimum scaled validation-MSE improvement to reset patience.
-        grad_clip: Maximum global gradient norm, or None to disable clipping.
-        seed: Seed for Optuna sampling and model training.
+        X_train (array-like): Training features scaled using training-only statistics.
+        y_train_scaled (array-like): Scaled training targets.
+        X_val (array-like): Validation features transformed using the training scaler.
+        y_val_scaled (array-like): Validation targets transformed using the training scaler.
+        y_scaler (StandardScaler): Fitted scaler used for original-unit metrics.
+        n_trials (int): Number of Optuna configurations to evaluate.
+        max_epochs (int): Maximum training epochs per trial.
+        patience (int): Early-stopping patience per trial.
+        min_delta (float): Minimum scaled validation-MSE improvement to reset patience.
+        grad_clip (float or None): Maximum global gradient norm; None disables clipping.
+        seed (int): Seed for Optuna sampling and model training.
 
     Returns:
-        Completed Optuna study; inspect study.best_trial for its winner.
+        optuna.Study: Completed study; inspect study.best_trial for its winner.
     """
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
