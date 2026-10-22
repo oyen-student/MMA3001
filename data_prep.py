@@ -19,10 +19,31 @@ def load_and_preprocess_data(
     val_size=0.10,
     random_state=42,
 ):
-    """Load data and return scaled features plus original/scaled targets.
+    """Load the MATLAB database and prepare leakage-safe data partitions.
 
-    The test split is isolated before fitting either scaler. The validation
-    fraction is expressed as a fraction of the complete dataset.
+    Features are transposed so each row represents one hull. The test split is
+    separated before the scalers are fitted; validation size is expressed as a
+    fraction of the complete dataset.
+
+    Args:
+        mat_file_path: Path to DTMB5415-database.mat.
+        target_row: Row index from coefStatMatrix to predict. Verify its physical
+            definition in the dataset documentation before interpreting results.
+        test_size: Fraction of all samples reserved for the held-out test set.
+        val_size: Fraction of all samples reserved for validation.
+        random_state: Seed controlling reproducible random splitting.
+
+    Returns:
+        Dictionary containing scaled feature arrays, original and scaled target
+        arrays, fitted scalers, feature labels, target-row metadata, and split
+        sizes. Scaled test features are returned for consistent preprocessing;
+        scaled test targets are intentionally not used for model selection.
+
+    Raises:
+        FileNotFoundError: If the requested MAT file does not exist.
+        KeyError: If required arrays are absent from the MAT file.
+        ValueError: If array dimensions, sample counts, split sizes, or values
+            are invalid.
     """
     path = Path(mat_file_path)
     if not path.is_file():
