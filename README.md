@@ -106,6 +106,25 @@ drive.mount("/content/drive")
 
 Replace the example path with the actual location of `DTMB5415-database.mat` in your mounted Drive.
 
+## Automated tests
+
+The test suite uses a small synthetic MATLAB-format dataset, so it does **not** require downloading the approximately 1 GB DTMB dataset or running Optuna tuning.
+
+Install runtime and test dependencies:
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
+From the repository root, run a syntax/bytecode compilation check followed by pytest:
+
+```bash
+python -m compileall -q .
+python -m pytest -q
+```
+
+The tests cover target-row bounds, mismatched MATLAB array dimensions, NaN/infinity rejection, train-only scaler fitting, the MLP training/prediction interface, known-value regression metrics, and a short end-to-end CLI smoke test. GitHub Actions runs the same checks on pushes and pull requests. A passing synthetic-data test suite checks core software behaviour; it does not prove that the target row has been physically identified correctly or replace a run on the real dataset.
+
 ## Outputs
 
 The output directory defaults to `outputs/` and contains:
