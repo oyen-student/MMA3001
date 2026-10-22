@@ -104,7 +104,7 @@ def train_optimized_mlp(
     Returns:
         tuple: The restored best-validation PyTorch model and a history dictionary
         containing loss curves, gradient norms, best epoch, and best validation loss.
-    ""
+    """
     set_seed(seed)
     device = get_device()
     X_train_t = torch.as_tensor(np.asarray(X_train), dtype=torch.float32)
