@@ -182,7 +182,16 @@ def train_optimized_mlp(
 
 
 def evaluate_pytorch_model(model, X_data, y_scaler):
-    """Return predictions in the target's original physical units."""
+    """Predict target values in the original target units.
+
+    Args:
+        model (torch.nn.Module): Trained PyTorch model.
+        X_data (array-like): Feature matrix transformed with training statistics.
+        y_scaler (StandardScaler): Fitted scaler used to reverse target scaling.
+
+    Returns:
+        numpy.ndarray: One-dimensional array of predictions in original units.
+    """
     device = next(model.parameters()).device
     X_t = torch.as_tensor(np.asarray(X_data), dtype=torch.float32, device=device)
     model.eval()
