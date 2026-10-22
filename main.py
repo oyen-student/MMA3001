@@ -20,6 +20,17 @@ from neural_network import (
 
 
 def main():
+    """Parse command-line options and run the complete regression workflow.
+
+    The workflow loads and splits the dataset, fits baseline models, optionally
+    tunes MLP hyperparameters and/or sweeps architectures, trains the selected
+    MLP, evaluates final models on the held-out test set, and writes metrics and
+    diagnostic plots to the output directory. The test set is not used to
+    select model configurations.
+
+    Command-line options control the dataset path, target row, Optuna trials,
+    training limits, gradient clipping, random seed, and output location.
+    """
     project_dir = Path(__file__).resolve().parent
     default_data_path = (
         project_dir / "data" / "dr-benchmark-5415hull" / "DTMB5415-database.mat"
