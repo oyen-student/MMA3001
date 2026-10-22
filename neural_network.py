@@ -79,7 +79,32 @@ def train_optimized_mlp(
     grad_clip=1.0,
     seed=42,
 ):
-    """Train with comparable loss tracking, gradient clipping, and early stopping."""
+    """Train an MLP with gradient clipping and validation-based early stopping.
+
+    Training and validation losses are measured after each epoch's updates in
+    evaluation mode. Gradient norms are recorded before clipping, and the
+    weights from the epoch with the lowest qualifying validation loss are
+    restored before returning.
+
+    Args:
+        X_train (array-like): Scaled training feature matrix.
+        y_train_scaled (array-like): Scaled training targets.
+        X_val (array-like): Validation features scaled with training statistics.
+        y_val_scaled (array-like): Validation targets scaled with training statistics.
+        hidden_sizes (tuple[int, ...]): Width of each hidden layer.
+        epochs (int): Maximum number of training epochs.
+        batch_size (int): Number of samples per minibatch.
+        lr (float): Adam optimiser learning rate.
+        weight_decay (float): L2-style weight decay passed to Adam.
+        patience (int): Epochs without qualifying validation improvement before stopping.
+        min_delta (float): Minimum decrease in validation MSE required to reset patience.
+        grad_clip (float or None): Maximum global gradient norm; None disables clipping.
+        seed (int): Random seed for reproducible initialisation and minibatch order.
+
+    Returns:
+        tuple: The restored best-validation PyTorch model and a history dictionary
+        containing loss curves, gradient norms, best epoch, and best validation loss.
+    ""
     set_seed(seed)
     device = get_device()
     X_train_t = torch.as_tensor(np.asarray(X_train), dtype=torch.float32)
@@ -299,24 +324,24 @@ def run_architecture_sweep(
     grad_clip=1.0,
     seed=42,
 ):
-    """Compare architectures using validation MSE without inspecting test data.
+    """Compare MLP architectures using validation MSE, not test data.
 
     Args:
-        X_train: Training features scaled using training-only statistics.
-        y_train_scaled: Scaled training targets.
-        X_val: Validation features transformed with the training feature scaler.
-        y_val_scaled: Validation targets transformed with the training target scaler.
-        y_scaler: Fitted target scaler used to report errors in original units.
-        architectures: Optional sequence of hidden-layer width tuples.
-        epochs: Maximum epochs per architecture.
-        patience: Early-stopping patience measured in epochs.
-        min_delta: Minimum scaled validation-MSE improvement required.
-        grad_clip: Maximum gradient norm, or None to disable clipping.
-        seed: Base random seed, incremented for each architecture.
+        X_train (array-like): Training features scaled using training-only statistics.
+        y_train_scaled (array-like): Scaled training targets.
+        X_val (array-like): Validation features transformed with the training scaler.
+        y_val_scaled (array-like): Validation targets transformed with the training scaler.
+        y_scaler (StandardScaler): Fitted target scaler used for original-unit metrics.
+        architectures (iterable[tuple[int, ...]] or None): Hidden-layer widths to compare.
+        epochs (int): Maximum epochs per architecture.
+        patience (int): Early-stopping patience measured in epochs.
+        min_delta (float): Minimum scaled validation-MSE improvement required.
+        grad_clip (float or None): Maximum gradient norm, or None to disable clipping.
+        seed (int): Base random seed, incremented for each architecture.
 
     Returns:
-        DataFrame sorted by validation MSE with train/validation errors and
-        the best epoch for each architecture.
+        pandas.DataFrame: Results sorted by validation MSE, including train/validation
+        errors and the best epoch for each architecture.
     """
     from sklearn.metrics import mean_squared_error
 
