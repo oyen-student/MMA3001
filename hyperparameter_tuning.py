@@ -18,10 +18,35 @@ def run_bayesian_search(
     grad_clip=1.0,
     seed=42,
 ):
-    """Tune architecture and learning rate using validation MSE in original units."""
+    """Search MLP hyperparameters using validation MSE in original target units.
+
+    Args:
+        X_train: Training features scaled using training-only statistics.
+        y_train_scaled: Scaled training targets.
+        X_val: Validation features transformed using the training feature scaler.
+        y_val_scaled: Validation targets transformed using the training target scaler.
+        y_scaler: Fitted target scaler used to calculate metrics in original units.
+        n_trials: Number of Optuna configurations to evaluate.
+        max_epochs: Maximum training epochs per trial.
+        patience: Early-stopping patience per trial.
+        min_delta: Minimum scaled validation-MSE improvement to reset patience.
+        grad_clip: Maximum global gradient norm, or None to disable clipping.
+        seed: Seed for Optuna sampling and model training.
+
+    Returns:
+        Completed Optuna study; inspect study.best_trial for its winner.
+    """
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     def objective(trial):
+        """Train one suggested configuration and return its validation MSE.
+
+        Args:
+            trial: Optuna trial used to sample hyperparameters.
+
+        Returns:
+            Validation MSE calculated in the target's original units.
+        """
         n_layers = trial.suggest_int("n_layers", 1, 3)
         hidden_sizes = tuple(
             trial.suggest_categorical(f"width_{i}", [32, 64, 96, 128])
@@ -56,6 +81,15 @@ def run_bayesian_search(
 
 
 def best_model_config(study):
+    """Convert the best Optuna trial into model-training arguments.
+
+    Args:
+        study: Completed study returned by run_bayesian_search.
+
+    Returns:
+        Dictionary containing hidden sizes, learning rate, weight decay,
+        and batch size for the selected configuration.
+    """
     params = study.best_trial.params
     n_layers = params["n_layers"]
     return {
@@ -67,6 +101,12 @@ def best_model_config(study):
 
 
 def plot_optuna_convergence(study, save_path=None):
+    """Plot individual Optuna scores and the best validation score so far.
+
+    Args:
+        study: Optuna study containing trial results.
+        save_path: Optional path at which to save the figure.
+    """
     import matplotlib.pyplot as plt
     import numpy as np
 
