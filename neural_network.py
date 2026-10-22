@@ -12,6 +12,11 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
 def set_seed(seed=42):
+    """Seed Python, NumPy, and PyTorch random-number generators.
+
+    Args:
+        seed: Integer seed used for reproducible initialisation and sampling.
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -20,11 +25,24 @@ def set_seed(seed=42):
 
 
 def get_device():
+    """Return the preferred PyTorch device, using CUDA when available.
+
+    Returns:
+        A CUDA device when available; otherwise, a CPU device.
+    """
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class PyTorchMLP(nn.Module):
+    """Fully connected regression network with ReLU hidden-layer activations."""
+
     def __init__(self, input_dim, hidden_sizes=(64, 32)):
+        """Construct the network from an input width and hidden-layer widths.
+
+        Args:
+            input_dim: Number of input features per sample.
+            hidden_sizes: Width of each hidden layer, in order.
+        """
         super().__init__()
         layers = []
         in_dim = input_dim
@@ -35,6 +53,14 @@ class PyTorchMLP(nn.Module):
         self.network = nn.Sequential(*layers)
 
     def forward(self, x):
+        """Run a batch through the network.
+
+        Args:
+            x: Tensor shaped (batch_size, input_dim).
+
+        Returns:
+            Tensor shaped (batch_size, 1) containing one output per sample.
+        """
         return self.network(x)
 
 
@@ -141,6 +167,15 @@ def evaluate_pytorch_model(model, X_data, y_scaler):
 
 
 def regression_metrics(y_true, y_pred):
+    """Calculate standard regression metrics in the supplied target units.
+
+    Args:
+        y_true: Ground-truth target values.
+        y_pred: Predictions corresponding to y_true.
+
+    Returns:
+        Dictionary containing MSE, RMSE, MAE, and coefficient of determination.
+    """
     return {
         "MSE": float(mean_squared_error(y_true, y_pred)),
         "RMSE": float(np.sqrt(mean_squared_error(y_true, y_pred))),
@@ -150,6 +185,12 @@ def regression_metrics(y_true, y_pred):
 
 
 def plot_training_history(history, save_path=None):
+    """Plot training and validation loss by epoch and mark the best epoch.
+
+    Args:
+        history: History dictionary returned by train_optimized_mlp.
+        save_path: Optional path at which to save the figure.
+    """
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(np.arange(1, len(history["train_loss"]) + 1), history["train_loss"], label="Training loss")
     ax.plot(np.arange(1, len(history["val_loss"]) + 1), history["val_loss"], label="Validation loss")
@@ -166,7 +207,12 @@ def plot_training_history(history, save_path=None):
 
 
 def plot_gradient_norms(history, save_path=None):
-    """Plot mean and maximum pre-clipping gradient norms per epoch."""
+    """Plot mean and maximum pre-clipping gradient norms per epoch.
+
+    Args:
+        history: Training-history dictionary containing gradient-norm series.
+        save_path: Optional path at which to save the figure.
+    """
     if not history.get("grad_norm_mean"):
         return
     epochs = np.arange(1, len(history["grad_norm_mean"]) + 1)
@@ -185,6 +231,14 @@ def plot_gradient_norms(history, save_path=None):
 
 
 def plot_predictions(y_true, y_pred, title="Predicted vs actual", save_path=None):
+    """Plot predicted targets against actual targets with a perfect-fit line.
+
+    Args:
+        y_true: Actual target values in original units.
+        y_pred: Predicted target values in original units.
+        title: Figure title.
+        save_path: Optional path at which to save the figure.
+    """
     metrics = regression_metrics(y_true, y_pred)
     lo = float(min(np.min(y_true), np.min(y_pred)))
     hi = float(max(np.max(y_true), np.max(y_pred)))
@@ -208,6 +262,15 @@ def plot_predictions(y_true, y_pred, title="Predicted vs actual", save_path=None
 
 
 def plot_residuals(y_true, y_pred, save_path=None):
+    """Plot residuals against predictions, with a horizontal zero reference.
+
+    Residuals are defined as actual target minus predicted target.
+
+    Args:
+        y_true: Actual target values in original units.
+        y_pred: Predicted target values in original units.
+        save_path: Optional path at which to save the figure.
+    """
     residuals = np.asarray(y_true) - np.asarray(y_pred)
     fig, ax = plt.subplots(figsize=(7, 5))
     ax.scatter(y_pred, residuals, alpha=0.55, s=18)
@@ -236,7 +299,25 @@ def run_architecture_sweep(
     grad_clip=1.0,
     seed=42,
 ):
-    """Compare architectures on validation MSE; does not inspect the test set."""
+    """Compare architectures using validation MSE without inspecting test data.
+
+    Args:
+        X_train: Training features scaled using training-only statistics.
+        y_train_scaled: Scaled training targets.
+        X_val: Validation features transformed with the training feature scaler.
+        y_val_scaled: Validation targets transformed with the training target scaler.
+        y_scaler: Fitted target scaler used to report errors in original units.
+        architectures: Optional sequence of hidden-layer width tuples.
+        epochs: Maximum epochs per architecture.
+        patience: Early-stopping patience measured in epochs.
+        min_delta: Minimum scaled validation-MSE improvement required.
+        grad_clip: Maximum gradient norm, or None to disable clipping.
+        seed: Base random seed, incremented for each architecture.
+
+    Returns:
+        DataFrame sorted by validation MSE with train/validation errors and
+        the best epoch for each architecture.
+    """
     from sklearn.metrics import mean_squared_error
 
     if architectures is None:
@@ -276,7 +357,12 @@ def run_architecture_sweep(
 
 
 def plot_sweep_results(results_df, save_path=None):
-    """Plot actual architecture-sweep results (not manually entered values)."""
+    """Compare training and validation MSE across tested architectures.
+
+    Args:
+        results_df: DataFrame returned by run_architecture_sweep.
+        save_path: Optional path at which to save the figure.
+    """
     fig, ax = plt.subplots(figsize=(12, 6))
     positions = np.arange(len(results_df))
     width = 0.38
