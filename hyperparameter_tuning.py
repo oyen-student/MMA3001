@@ -122,7 +122,7 @@ def best_model_config(study):
     }
 
 
-def plot_optuna_convergence(study, save_path=None):
+def plot_optuna_convergence(study, save_path=None, title_suffix=None):
     """Plot individual Optuna scores and the best validation score so far.
 
     Args:
@@ -142,7 +142,10 @@ def plot_optuna_convergence(study, save_path=None):
     ax.step(trial_numbers, running_best, where="post", linewidth=2, label="Best so far")
     ax.set_xlabel("Optuna trial")
     ax.set_ylabel("Validation MSE (original target units squared)")
-    ax.set_title("Hyperparameter-search history")
+    title = "Hyperparameter-search history"
+    if title_suffix:
+        title = f"{title}\n{title_suffix}"
+    ax.set_title(title)
     ax.grid(True, alpha=0.3)
     ax.legend()
     fig.tight_layout()

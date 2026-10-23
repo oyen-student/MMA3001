@@ -220,7 +220,7 @@ def test_cli_smoke_run_without_real_dataset(tmp_path, synthetic_mat):
         f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
     )
     assert (output_dir / "metrics.json").is_file()
-    assert (output_dir / "training_validation_loss.png").is_file()
+    assert (output_dir / "training_loss.png").is_file()
     assert (output_dir / "test_predictions.png").is_file()
     assert (output_dir / "test_model_comparison.png").is_file()
     metrics = json.loads((output_dir / "metrics.json").read_text(encoding="utf-8"))

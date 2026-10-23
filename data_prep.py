@@ -42,6 +42,7 @@ def load_and_preprocess_data(
     test_size=0.20,
     val_size=0.10,
     random_state=42,
+    exclude_training_sample_indices=(),
 ):
     """Load the MATLAB database and prepare leakage-safe data partitions.
 
@@ -57,6 +58,9 @@ def load_and_preprocess_data(
         test_size (float): Fraction of all samples reserved for the held-out test set.
         val_size (float): Fraction of all samples reserved for validation.
         random_state (int): Seed controlling reproducible random splitting.
+        exclude_training_sample_indices (iterable[int]): Optional zero-based
+            source sample indices to omit from training after the split is made.
+            Validation and test membership remain unchanged.
 
     Returns:
         dict: Scaled feature arrays, original and scaled target arrays, fitted
@@ -117,6 +121,24 @@ def load_and_preprocess_data(
         train_val_idx, test_size=relative_val_size, random_state=random_state
     )
 
+    excluded_indices = [int(index) for index in exclude_training_sample_indices]
+    if len(set(excluded_indices)) != len(excluded_indices):
+        raise ValueError("Excluded training sample indices must be unique.")
+    if any(index < 0 or index >= len(y) for index in excluded_indices):
+        raise ValueError("An excluded training sample index is outside the dataset.")
+    not_in_training = sorted(set(excluded_indices) - set(train_idx.tolist()))
+    if not_in_training:
+        raise ValueError(
+            "Only samples assigned to the training split can be excluded; "
+            f"these indices are not in training: {not_in_training}"
+        )
+    if len(excluded_indices) >= len(train_idx):
+        raise ValueError("At least one training sample must remain after exclusions.")
+    excluded_set = set(excluded_indices)
+    train_idx = np.asarray(
+        [index for index in train_idx if int(index) not in excluded_set], dtype=int
+    )
+
     X_train, X_val, X_test = X[train_idx], X[val_idx], X[test_idx]
     y_train, y_val, y_test = y[train_idx], y[val_idx], y[test_idx]
 
@@ -127,6 +149,8 @@ def load_and_preprocess_data(
     split_by_sample[train_idx] = "train"
     split_by_sample[val_idx] = "validation"
     split_by_sample[test_idx] = "test"
+    if excluded_indices:
+        split_by_sample[np.asarray(excluded_indices, dtype=int)] = "excluded"
     _, duplicate_inverse, duplicate_counts = np.unique(
         X, axis=0, return_inverse=True, return_counts=True
     )
@@ -135,9 +159,10 @@ def load_and_preprocess_data(
     cross_split_duplicate_samples = 0
     for group_index in duplicate_group_indices:
         members = np.flatnonzero(duplicate_inverse == group_index)
-        if np.unique(split_by_sample[members]).size > 1:
+        active_members = members[split_by_sample[members] != "excluded"]
+        if np.unique(split_by_sample[active_members]).size > 1:
             cross_split_duplicate_groups += 1
-            cross_split_duplicate_samples += len(members)
+            cross_split_duplicate_samples += len(active_members)
     duplicate_audit = {
         "method": "exact equality of normalized design-variable rows",
         "duplicate_groups": int(len(duplicate_group_indices)),
@@ -173,6 +198,7 @@ def load_and_preprocess_data(
         "feature_names": feature_names,
         "target_row": target_row,
         "target_definition": TARGET_ROW_DEFINITIONS.get(target_row),
+        "excluded_training_sample_indices": excluded_indices,
         "n_samples": len(y),
         "n_features": X.shape[1],
         "split_sizes": {

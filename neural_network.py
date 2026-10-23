@@ -219,20 +219,33 @@ def regression_metrics(y_true, y_pred):
     }
 
 
-def plot_training_history(history, save_path=None):
-    """Plot training and validation loss by epoch and mark the best epoch.
+def plot_training_history(history, save_path=None, title_suffix=None):
+    """Plot training loss by epoch and distinguish stopping from checkpointing.
 
     Args:
         history: History dictionary returned by train_optimized_mlp.
         save_path: Optional path at which to save the figure.
     """
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(np.arange(1, len(history["train_loss"]) + 1), history["train_loss"], label="Training loss")
-    ax.plot(np.arange(1, len(history["val_loss"]) + 1), history["val_loss"], label="Validation loss")
-    ax.axvline(history["best_epoch"], linestyle="--", alpha=0.7, label=f"Best epoch: {history['best_epoch']}")
+    epochs = np.arange(1, len(history["train_loss"]) + 1)
+    ax.plot(epochs, history["train_loss"], label="Training loss", color="#1f77b4")
+    ax.axvline(
+        history["stopped_epoch"], linestyle="--", alpha=0.7, color="#555555",
+        label=f"Training stopped: epoch {history['stopped_epoch']}",
+    )
+    ax.text(
+        0.02, 0.02,
+        f"Final weights restored from epoch {history['best_epoch']}\n"
+        "(lowest validation loss; validation curve omitted)",
+        transform=ax.transAxes, va="bottom", fontsize=9,
+        bbox={"facecolor": "white", "alpha": 0.8, "edgecolor": "none"},
+    )
     ax.set_xlabel("Epoch")
     ax.set_ylabel("MSE (standardised target)")
-    ax.set_title("MLP training and validation convergence")
+    title = "MLP training loss by epoch"
+    if title_suffix:
+        title = f"{title}\n{title_suffix}"
+    ax.set_title(title)
     ax.grid(True, alpha=0.3)
     ax.legend()
     fig.tight_layout()
@@ -241,7 +254,7 @@ def plot_training_history(history, save_path=None):
     plt.show()
 
 
-def plot_gradient_norms(history, save_path=None):
+def plot_gradient_norms(history, save_path=None, title_suffix=None):
     """Plot mean and maximum pre-clipping gradient norms per epoch.
 
     Args:
@@ -256,7 +269,10 @@ def plot_gradient_norms(history, save_path=None):
     ax.plot(epochs, history["grad_norm_max"], label="Maximum gradient norm", alpha=0.8)
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Global gradient norm (before clipping)")
-    ax.set_title("MLP gradient-norm diagnostics")
+    title = "MLP gradient-norm diagnostics"
+    if title_suffix:
+        title = f"{title}\n{title_suffix}"
+    ax.set_title(title)
     ax.grid(True, alpha=0.3)
     ax.legend()
     fig.tight_layout()
@@ -266,7 +282,7 @@ def plot_gradient_norms(history, save_path=None):
 
 
 def plot_predictions(y_true, y_pred, title="Predicted vs actual", save_path=None):
-    """Plot predicted targets against actual targets with a perfect-fit line.
+    """Plot predicted targets against actual targets with a 1:1 reference.
 
     Args:
         y_true: Actual target values in original units.
@@ -279,7 +295,11 @@ def plot_predictions(y_true, y_pred, title="Predicted vs actual", save_path=None
     hi = float(max(np.max(y_true), np.max(y_pred)))
     fig, ax = plt.subplots(figsize=(7, 6))
     ax.scatter(y_true, y_pred, alpha=0.55, s=18)
-    ax.plot([lo, hi], [lo, hi], "k--", linewidth=1.5)
+    ax.plot(
+        [lo, hi], [lo, hi], "k--", linewidth=1.5,
+        label="1:1 reference (actual = predicted)",
+    )
+    ax.legend()
     ax.set_xlabel("Actual target")
     ax.set_ylabel("Predicted target")
     ax.set_title(title)
@@ -296,7 +316,140 @@ def plot_predictions(y_true, y_pred, title="Predicted vs actual", save_path=None
     plt.show()
 
 
-def plot_model_comparison(y_true, predictions, save_path=None):
+def plot_train_validation_predictions(
+    y_train,
+    train_predictions,
+    y_val,
+    val_predictions,
+    save_path=None,
+    model_config=None,
+    configuration_source=None,
+    comparison_label=None,
+):
+    """Compare final-refit MLP predictions on training and validation data.
+
+    Training points are in-sample; validation points were not used for weight
+    updates but may have informed early stopping and hyperparameter selection.
+    The figure has a full-range panel with every observation and a zoomed panel
+    that makes dense regions visible without dropping points from the full view.
+
+    Args:
+        y_train: Training targets in original units.
+        train_predictions: MLP predictions for training samples in original units.
+        y_val: Validation targets in original units.
+        val_predictions: MLP predictions for validation samples in original units.
+        save_path: Optional path at which to save the figure.
+        model_config: Selected hidden sizes and optimizer settings used by the refit.
+        configuration_source: How the configuration was selected or loaded.
+        comparison_label: Dataset condition used in this run.
+    """
+    y_train = np.asarray(y_train)
+    train_predictions = np.asarray(train_predictions)
+    y_val = np.asarray(y_val)
+    val_predictions = np.asarray(val_predictions)
+
+    train_metrics = regression_metrics(y_train, train_predictions)
+    val_metrics = regression_metrics(y_val, val_predictions)
+    all_values = np.concatenate(
+        [y_train, train_predictions, y_val, val_predictions]
+    )
+    lo = float(np.min(all_values))
+    hi = float(np.max(all_values))
+    if lo == hi:
+        padding = max(abs(lo) * 0.05, 1e-9)
+        lo -= padding
+        hi += padding
+
+    zoom_lo, zoom_hi = np.percentile(all_values, [0.5, 99.5])
+    if zoom_hi <= zoom_lo:
+        zoom_lo, zoom_hi = lo, hi
+
+    train_in_zoom = (
+        (y_train >= zoom_lo) & (y_train <= zoom_hi)
+        & (train_predictions >= zoom_lo) & (train_predictions <= zoom_hi)
+    )
+    val_in_zoom = (
+        (y_val >= zoom_lo) & (y_val <= zoom_hi)
+        & (val_predictions >= zoom_lo) & (val_predictions <= zoom_hi)
+    )
+
+    if configuration_source == "fresh_optuna_search":
+        source_label = "Optuna-selected configuration, final refit"
+    elif configuration_source == "reused_optuna_config":
+        source_label = "Reused Optuna configuration, final refit"
+    elif configuration_source == "fixed_defaults":
+        source_label = "Fixed default configuration, final fit"
+    else:
+        source_label = "Final MLP refit"
+    if model_config:
+        config_label = (
+            f"layers={tuple(model_config['hidden_sizes'])}, "
+            f"lr={model_config['lr']:.3g}, "
+            f"weight decay={model_config['weight_decay']:.3g}, "
+            f"batch size={model_config['batch_size']}"
+        )
+    else:
+        config_label = "configuration not supplied"
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 7))
+    views = (
+        (axes[0], np.ones(len(y_train), dtype=bool), np.ones(len(y_val), dtype=bool), lo, hi,
+         "Full target range (all observations)"),
+        (axes[1], train_in_zoom, val_in_zoom, zoom_lo, zoom_hi,
+         "Central range (zoom; clipped counts shown)"),
+    )
+    for ax, train_mask, val_mask, axis_lo, axis_hi, title in views:
+        ax.scatter(
+            y_train[train_mask],
+            train_predictions[train_mask],
+            color="#1f77b4",
+            alpha=0.18 if ax is axes[0] else 0.28,
+            s=8 if ax is axes[0] else 10,
+            edgecolors="none",
+            rasterized=True,
+            label=(
+                f"Training shown={int(train_mask.sum())}/{len(y_train)}; "
+                f"RMSE={train_metrics['RMSE']:.3g}, R²={train_metrics['R2']:.3f}"
+            ),
+        )
+        ax.scatter(
+            y_val[val_mask],
+            val_predictions[val_mask],
+            color="#ff7f0e",
+            alpha=0.75,
+            s=15,
+            edgecolors="none",
+            rasterized=True,
+            label=(
+                f"Validation shown={int(val_mask.sum())}/{len(y_val)}; "
+                f"RMSE={val_metrics['RMSE']:.3g}, R²={val_metrics['R2']:.3f}"
+            ),
+        )
+        ax.plot(
+            [axis_lo, axis_hi], [axis_lo, axis_hi],
+            "k--", linewidth=1.3,
+            label="1:1 reference (actual = predicted)",
+        )
+        ax.set_xlim(axis_lo, axis_hi)
+        ax.set_ylim(axis_lo, axis_hi)
+        ax.set_aspect("equal", adjustable="box")
+        ax.set_xlabel("Actual target (original units)")
+        ax.set_ylabel("Predicted target (original units)")
+        ax.set_title(title)
+        ax.grid(True, alpha=0.25)
+        ax.legend(fontsize=8, loc="best")
+
+    subtitle = f"{source_label}\n{config_label}"
+    if comparison_label:
+        subtitle = f"{subtitle}\n{comparison_label}"
+    fig.suptitle(subtitle, fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    if save_path:
+        fig.savefig(save_path, dpi=160)
+    plt.show()
+
+
+def plot_model_comparison(y_true, predictions, save_path=None, title_suffix=None):
     """Compare model predictions against actual targets on the same axes.
 
     Args:
@@ -318,10 +471,16 @@ def plot_model_comparison(y_true, predictions, save_path=None):
             s=20,
             label=f"{name} (R²={metrics['R2']:.3f}, RMSE={metrics['RMSE']:.3g})",
         )
-    ax.plot([lo, hi], [lo, hi], "k--", linewidth=1.5, label="Perfect predictions")
+    ax.plot(
+        [lo, hi], [lo, hi], "k--", linewidth=1.5,
+        label="1:1 reference (actual = predicted)",
+    )
     ax.set_xlabel("Actual target")
     ax.set_ylabel("Predicted target")
-    ax.set_title("Linear regression vs MLP: held-out test predictions")
+    title = "Linear regression vs MLP: held-out test predictions"
+    if title_suffix:
+        title = f"{title}\n{title_suffix}"
+    ax.set_title(title)
     ax.grid(True, alpha=0.25)
     ax.legend()
     fig.tight_layout()
@@ -330,7 +489,7 @@ def plot_model_comparison(y_true, predictions, save_path=None):
     plt.show()
 
 
-def plot_residuals(y_true, y_pred, save_path=None):
+def plot_residuals(y_true, y_pred, save_path=None, title_suffix=None):
     """Plot residuals against predictions, with a horizontal zero reference.
 
     Residuals are defined as actual target minus predicted target.
@@ -346,12 +505,93 @@ def plot_residuals(y_true, y_pred, save_path=None):
     ax.axhline(0, color="black", linestyle="--", linewidth=1.3)
     ax.set_xlabel("Predicted target")
     ax.set_ylabel("Residual (actual - predicted)")
-    ax.set_title("Residuals vs predicted values")
+    title = "Residuals vs predicted values"
+    if title_suffix:
+        title = f"{title}\n{title_suffix}"
+    ax.set_title(title)
     ax.grid(True, alpha=0.25)
     fig.tight_layout()
     if save_path:
         fig.savefig(save_path, dpi=160)
     plt.show()
+
+
+def plot_runtime_breakdown(stage_timings, total_runtime, save_path=None, title_suffix=None):
+    """Plot elapsed time by pipeline stage alongside the total run time.
+
+    Args:
+        stage_timings: Mapping from stage names to elapsed seconds.
+        total_runtime: Elapsed pipeline seconds before final report-file writing.
+        save_path: Optional path at which to save the figure.
+    """
+    excluded_keys = {"elapsed_before_metrics_json_write"}
+    stages = [
+        (name, float(seconds))
+        for name, seconds in stage_timings.items()
+        if name not in excluded_keys and float(seconds) > 0
+    ]
+    labels = [name.replace("_", " ").title() for name, _ in stages]
+    values = [seconds for _, seconds in stages]
+
+    fig, (stage_ax, total_ax) = plt.subplots(
+        1,
+        2,
+        figsize=(13, max(5, 0.42 * len(stages))),
+        gridspec_kw={"width_ratios": [4, 1]},
+    )
+    positions = np.arange(len(stages))
+    bars = stage_ax.barh(positions, values, color="#4c78a8")
+    stage_ax.set_yticks(positions)
+    stage_ax.set_yticklabels(labels)
+    stage_ax.invert_yaxis()
+    stage_ax.set_xlabel("Elapsed time (seconds)")
+    stage_ax.set_title("Runtime by pipeline stage")
+    stage_ax.grid(True, axis="x", alpha=0.25)
+    stage_ax.bar_label(bars, labels=[f"{value:.2f}s" for value in values], padding=3)
+
+    total_bar = total_ax.barh(["Total"], [total_runtime], color="#f58518")
+    total_ax.set_xlim(0, max(total_runtime * 1.15, 1.0))
+    total_ax.set_xlabel("Seconds")
+    total_ax.set_title("Total run")
+    total_ax.grid(True, axis="x", alpha=0.25)
+    total_ax.bar_label(total_bar, labels=[f"{total_runtime:.1f}s"], padding=3)
+    title = "Experiment runtime (total excludes this chart and montage)"
+    if title_suffix:
+        title = f"{title}\n{title_suffix}"
+    fig.suptitle(title)
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=160)
+    plt.close(fig)
+
+
+def create_plot_montage(plot_items, save_path, columns=2):
+    """Combine saved plot images into a labeled montage for quick review.
+
+    Args:
+        plot_items: Iterable of (image path, title) pairs.
+        save_path: Output image path.
+        columns: Number of montage columns.
+    """
+    plot_items = [(path, title) for path, title in plot_items if path.is_file()]
+    if not plot_items:
+        raise ValueError("No plot images were available to create a montage.")
+    rows = int(np.ceil(len(plot_items) / columns))
+    fig, axes = plt.subplots(
+        rows,
+        columns,
+        figsize=(14, 4.5 * rows),
+        squeeze=False,
+    )
+    for ax, (image_path, title) in zip(axes.flat, plot_items):
+        ax.imshow(plt.imread(image_path))
+        ax.set_title(title, fontsize=11)
+        ax.axis("off")
+    for ax in list(axes.flat)[len(plot_items):]:
+        ax.axis("off")
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=140)
+    plt.close(fig)
 
 
 
@@ -433,7 +673,7 @@ def run_architecture_sweep(
     return pd.DataFrame(rows).sort_values("val_mse").reset_index(drop=True)
 
 
-def plot_sweep_results(results_df, save_path=None):
+def plot_sweep_results(results_df, save_path=None, title_suffix=None):
     """Compare training and validation MSE across tested architectures.
 
     Args:
@@ -455,7 +695,10 @@ def plot_sweep_results(results_df, save_path=None):
         ax.set_yscale("log")
     ax.set_ylabel("MSE (original target units squared)")
     ax.set_xlabel("Hidden-layer architecture")
-    ax.set_title("MLP architecture sweep: training vs validation error")
+    title = "MLP architecture sweep: training vs validation error"
+    if title_suffix:
+        title = f"{title}\n{title_suffix}"
+    ax.set_title(title)
     ax.grid(True, axis="y", alpha=0.25)
     ax.legend()
     fig.tight_layout()
