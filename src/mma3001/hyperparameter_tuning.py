@@ -59,6 +59,8 @@ def run_bayesian_search(
             Validation MSE calculated in the target's original units.
         """
         trial_started = perf_counter()
+        # Sample depth first, then one width per active layer; inactive widths
+        # are ignored when the winner is converted back into a model config.
         n_layers = trial.suggest_int("n_layers", 1, 3)
         hidden_sizes = tuple(
             trial.suggest_categorical(f"width_{i}", [32, 64, 96, 128])
@@ -96,6 +98,8 @@ def run_bayesian_search(
         )
         return validation_mse
 
+    # TPE uses completed trial results to guide later samples; the fixed seed
+    # makes the proposal sequence repeatable for the same environment/settings.
     sampler = optuna.samplers.TPESampler(seed=seed)
     study = optuna.create_study(direction="minimize", sampler=sampler)
     study.optimize(objective, n_trials=n_trials)

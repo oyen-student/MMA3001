@@ -117,6 +117,8 @@ def train_optimized_mlp(
         device=device,
     )
 
+    # A seeded generator makes minibatch order reproducible independently of
+    # any random-number use elsewhere in the process.
     loader = DataLoader(
         TensorDataset(X_train_t, y_train_t),
         batch_size=min(batch_size, len(X_train_t)),
@@ -132,6 +134,7 @@ def train_optimized_mlp(
         "grad_norm_mean": [], "grad_norm_max": [],
     }
     best_val = float("inf")
+    # Keep a copy because later optimizer steps mutate the live model in place.
     best_state = deepcopy(model.state_dict())
     best_epoch = 0
     epochs_without_improvement = 0
@@ -164,6 +167,8 @@ def train_optimized_mlp(
         history["grad_norm_mean"].append(float(np.mean(epoch_grad_norms)))
         history["grad_norm_max"].append(float(np.max(epoch_grad_norms)))
 
+        # Validation selects a checkpoint and stopping time; it never supplies
+        # gradients. min_delta prevents tiny numerical changes resetting patience.
         if val_loss < best_val - min_delta:
             best_val = val_loss
             best_state = deepcopy(model.state_dict())
@@ -174,6 +179,7 @@ def train_optimized_mlp(
             if epochs_without_improvement >= patience:
                 break
 
+    # Return the best validation checkpoint, not necessarily the last epoch.
     model.load_state_dict(best_state)
     model.eval()
     history["best_epoch"] = best_epoch
@@ -198,6 +204,7 @@ def evaluate_pytorch_model(model, X_data, y_scaler):
     model.eval()
     with torch.no_grad():
         pred_scaled = model(X_t).cpu().numpy().reshape(-1, 1)
+    # All reported errors and plots use the target's original, unscaled units.
     return y_scaler.inverse_transform(pred_scaled).ravel()
 
 
@@ -356,14 +363,19 @@ def plot_train_validation_predictions(
     lo = float(np.min(all_values))
     hi = float(np.max(all_values))
     if lo == hi:
+        # Avoid identical axis limits for a constant target/prediction case.
         padding = max(abs(lo) * 0.05, 1e-9)
         lo -= padding
         hi += padding
 
+    # Keep the left panel complete; use robust bounds only for the right zoom
+    # so extreme values do not compress the dense central cloud.
     zoom_lo, zoom_hi = np.percentile(all_values, [0.5, 99.5])
     if zoom_hi <= zoom_lo:
         zoom_lo, zoom_hi = lo, hi
 
+    # A point belongs in the zoom only when both coordinates fit; the full
+    # range panel above still contains every training and validation record.
     train_in_zoom = (
         (y_train >= zoom_lo) & (y_train <= zoom_hi)
         & (train_predictions >= zoom_lo) & (train_predictions <= zoom_hi)
@@ -471,6 +483,7 @@ def plot_model_comparison(y_true, predictions, save_path=None, title_suffix=None
             s=20,
             label=f"{name} (R²={metrics['R2']:.3f}, RMSE={metrics['RMSE']:.3g})",
         )
+    # This diagonal is a perfect-agreement reference, not a fitted model line.
     ax.plot(
         [lo, hi], [lo, hi], "k--", linewidth=1.5,
         label="1:1 reference (actual = predicted)",
@@ -583,6 +596,8 @@ def create_plot_montage(plot_items, save_path, columns=2):
         figsize=(14, 4.5 * rows),
         squeeze=False,
     )
+    # Only existing plots enter the montage; missing optional sweep/tuning
+    # figures therefore do not create blank panels.
     for ax, (image_path, title) in zip(axes.flat, plot_items):
         ax.imshow(plt.imread(image_path))
         ax.set_title(title, fontsize=11)
@@ -637,6 +652,7 @@ def run_architecture_sweep(
         ]
     architectures = list(architectures)
 
+    # Convert once so every architecture is ranked in the same original units.
     y_val_original = y_scaler.inverse_transform(
         np.asarray(y_val_scaled).reshape(-1, 1)
     ).ravel()
@@ -650,6 +666,7 @@ def run_architecture_sweep(
             patience=patience,
             min_delta=min_delta,
             grad_clip=grad_clip,
+            # Vary initialization per candidate while keeping the sweep repeatable.
             seed=seed + index,
         )
         train_pred = evaluate_pytorch_model(model, X_train, y_scaler)
@@ -670,6 +687,8 @@ def run_architecture_sweep(
             f"validation MSE={rows[-1]['val_mse']:.6g}, "
             f"runtime={rows[-1]['runtime_seconds']:.2f} s"
         )
+    # The sorted first row is the winner by validation error; test data is never
+    # available to this routine and cannot influence the sweep decision.
     return pd.DataFrame(rows).sort_values("val_mse").reset_index(drop=True)
 
 
@@ -691,6 +710,7 @@ def plot_sweep_results(results_df, save_path=None, title_suffix=None):
         results_df["train_mse"].to_numpy(),
         results_df["val_mse"].to_numpy(),
     ])
+    # Log scaling separates small errors only when all values are positive.
     if np.all(positive > 0):
         ax.set_yscale("log")
     ax.set_ylabel("MSE (original target units squared)")

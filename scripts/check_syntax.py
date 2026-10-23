@@ -13,6 +13,8 @@ EXCLUDED_DIRECTORIES = {
 def main():
     """Parse every project Python file outside generated/vendor directories."""
     files = []
+    # Parse source and test files directly instead of importing them; this
+    # avoids executing pipeline code or requiring the large local dataset.
     for current_dir, directory_names, file_names in os.walk(PROJECT_ROOT):
         directory_names[:] = [
             name for name in directory_names if name not in EXCLUDED_DIRECTORIES

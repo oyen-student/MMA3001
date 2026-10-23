@@ -102,6 +102,7 @@ def load_and_preprocess_data(
     if not 0 < test_size < 1 or not 0 < val_size < 1 or test_size + val_size >= 1:
         raise ValueError("Require 0 < test_size < 1, 0 < val_size < 1, and their sum < 1.")
 
+    # MATLAB stores one hull per column; scikit-learn expects one hull per row.
     X = raw_x.T
     y = raw_y[target_row, :]
 
@@ -111,15 +112,21 @@ def load_and_preprocess_data(
             "rather than silently imputing or dropping them."
         )
 
+    # Split integer sample IDs first so the exact memberships can be audited
+    # and reused when a named training observation is excluded below.
     indices = np.arange(len(y))
     train_val_idx, test_idx = train_test_split(
         indices, test_size=test_size, random_state=random_state
     )
+    # val_size is defined against the full dataset, but this second split sees
+    # only the post-test remainder; convert it to that remainder's fraction.
     relative_val_size = val_size / (1.0 - test_size)
     train_idx, val_idx = train_test_split(
         train_val_idx, test_size=relative_val_size, random_state=random_state
     )
 
+    # Apply exclusions after splitting so train/validation/test membership is
+    # unchanged between paired sensitivity runs.
     excluded_indices = [int(index) for index in exclude_training_sample_indices]
     if len(set(excluded_indices)) != len(excluded_indices):
         raise ValueError("Excluded training sample indices must be unique.")
@@ -156,6 +163,8 @@ def load_and_preprocess_data(
     duplicate_group_indices = np.flatnonzero(duplicate_counts > 1)
     cross_split_duplicate_groups = 0
     cross_split_duplicate_samples = 0
+    # duplicate_inverse maps each row to its exact-equality group. Excluded
+    # rows do not count as leakage because they never reach a fitted model.
     for group_index in duplicate_group_indices:
         members = np.flatnonzero(duplicate_inverse == group_index)
         active_members = members[split_by_sample[members] != "excluded"]
@@ -181,6 +190,8 @@ def load_and_preprocess_data(
 
     y_train_scaled = y_scaler.transform(y_train.reshape(-1, 1)).astype(np.float32).ravel()
     y_val_scaled = y_scaler.transform(y_val.reshape(-1, 1)).astype(np.float32).ravel()
+    # Test targets remain in original units: they never affect fitting, early
+    # stopping, or hyperparameter selection.
 
     feature_names = [f"Param_{i + 1}" for i in range(X.shape[1])]
     return {

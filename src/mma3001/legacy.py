@@ -36,6 +36,8 @@ def load_and_preprocess_data(mat_file_path, output_dir=None, **kwargs):
     if output_dir is not None:
         destination = Path(output_dir)
         destination.mkdir(parents=True, exist_ok=True)
+        # Preserve legacy CSV names while sourcing splits from the same
+        # validated loader used by the current CLI.
         for split in ("train", "validation", "test"):
             x = data[f"X_{'val' if split == 'validation' else split}"]
             y = data[f"y_{'val' if split == 'validation' else split}"]
@@ -44,6 +46,7 @@ def load_and_preprocess_data(mat_file_path, output_dir=None, **kwargs):
             filename = "val.csv" if split == "validation" else f"{split}.csv"
             frame.to_csv(destination / filename, index=False)
 
+    # Older callers expect this tuple order rather than the loader's dict.
     return (
         data["X_train"], data["X_val"], data["X_test"],
         data["y_train"], data["y_val"], data["y_test"],

@@ -31,9 +31,13 @@ def main() -> None:
     sys.path.insert(0, str(SOURCE_DIRECTORY))
     OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
+    # Document the package once so pdoc discovers its submodules without
+    # creating duplicate entries for explicitly repeated module names.
     pdoc.pdoc(*MODULES, output_directory=OUTPUT_DIRECTORY)
     for stale_page in OUTPUT_DIRECTORY.glob("*.html"):
         if stale_page.name not in {"index.html", "mma3001.html"}:
+            # Remove pages from the previous flat-module layout only after the
+            # new package pages have been generated successfully.
             stale_page.unlink()
     for page_path in OUTPUT_DIRECTORY.rglob("*.html"):
         page = page_path.read_text(encoding="utf-8")

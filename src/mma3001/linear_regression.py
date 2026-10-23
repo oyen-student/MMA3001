@@ -16,6 +16,8 @@ class MeanBaseline:
         Returns:
             This fitted baseline estimator.
         """
+        # Estimate the constant from training targets only; another split
+        # would leak information into this baseline.
         self.mean_ = float(np.mean(y))
         return self
 
@@ -41,6 +43,7 @@ def train_linear_regression(X_train, y_train):
     Returns:
         A fitted scikit-learn LinearRegression estimator.
     """
+    # Inputs have already been scaled with training-only statistics.
     model = LinearRegression()
     model.fit(X_train, y_train)
     return model

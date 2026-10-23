@@ -53,6 +53,8 @@ def _load_reusable_config(config_path, expected_context):
     saved_context = saved.get("context")
     if not isinstance(saved_context, dict):
         raise ValueError("Reusable configuration is missing its experiment context.")
+    # Reuse is valid only for the same data/split context; preventing silent
+    # mismatch is more important than accepting every old hyperparameter file.
     mismatches = [
         key for key, expected_value in expected_context.items()
         if saved_context.get(key) != expected_value
@@ -69,6 +71,8 @@ def _load_reusable_config(config_path, expected_context):
         raise ValueError("Reusable configuration is missing model settings.")
     try:
         raw_hidden_sizes = config["hidden_sizes"]
+        # In Python bool is an int subclass, but true/false are not meaningful
+        # layer widths or batch sizes in a saved model configuration.
         if not isinstance(raw_hidden_sizes, list) or any(
             not isinstance(width, int) or isinstance(width, bool)
             for width in raw_hidden_sizes
@@ -114,6 +118,8 @@ def main():
     Command-line options control the dataset path, target row, Optuna trials,
     training limits, gradient clipping, random seed, and output location.
     """
+    # main.py is nested under src/mma3001; resolve defaults from the repository
+    # root so the CLI behaves the same from any current working directory.
     project_dir = Path(__file__).resolve().parents[2]
     default_data_path = (
         project_dir / "data" / "dr-benchmark-5415hull" / "DTMB5415-database.mat"
@@ -235,6 +241,8 @@ def main():
 
     X_train, X_val, X_test = data["X_train"], data["X_val"], data["X_test"]
     y_train, y_val, y_test = data["y_train"], data["y_val"], data["y_test"]
+    # These quick file attributes reject most stale cached configs without
+    # hashing a potentially gigabyte-sized MAT file; they are not a checksum.
     dataset_stat = args.data.stat()
     config_context = {
         "data_path": str(args.data.resolve()),
@@ -269,6 +277,8 @@ def main():
     # Baselines: constant mean and linear regression.
     baselines = {}
     results = {}
+    # Baselines learn only from the training partition; validation is used for
+    # comparison and the held-out test partition is kept untouched for later.
     baseline_factories = (
         ("Mean baseline", lambda: MeanBaseline().fit(X_train, y_train)),
         ("Linear regression", lambda: train_linear_regression(X_train, y_train)),
@@ -288,6 +298,8 @@ def main():
 
     config_source = "fixed_defaults"
     reused_config_metadata = None
+    # Exactly one source supplies the MLP settings: a validated cache, fixed
+    # defaults, or a fresh Optuna study. The optional sweep is separate.
     if args.reuse_config is not None:
         stage_started = perf_counter()
         try:
@@ -328,6 +340,8 @@ def main():
         print(f"Best Optuna validation MSE: {study.best_value:.6g}")
         print(f"Best configuration: {config}")
         config_save_started = perf_counter()
+        # Save the winner with enough context to detect incompatible reuse on a
+        # later run rather than silently applying it to different data/splits.
         saved_config_path = output_dir / "best_config.json"
         with saved_config_path.open("w", encoding="utf-8") as config_file:
             json.dump(
@@ -382,6 +396,8 @@ def main():
     plot_gradient_norms(
         history, output_dir / "gradient_norms.png", comparison_label
     )
+    # These train/validation predictions come from the final selected-model
+    # fit, after Optuna selection or config reuse, rather than a search trial.
     mlp_train_pred = evaluate_pytorch_model(model, X_train, data["y_scaler"])
     mlp_val_pred = evaluate_pytorch_model(model, X_val, data["y_scaler"])
     # This diagnostic uses predictions from the final MLP refit with the
@@ -400,6 +416,8 @@ def main():
 
     # Keep test data out of model selection; evaluate each final model here.
     stage_started = perf_counter()
+    # Test metrics are calculated only after configurations and checkpoints
+    # have been selected using training/validation data.
     test_predictions = {}
     for name, baseline in baselines.items():
         train_pred = baseline.predict(X_train)
@@ -477,6 +495,8 @@ def main():
     _finish_stage("test_diagnostic_plots", stage_started, timings)
 
     runtime_plot_path = output_dir / "runtime_breakdown.png"
+    # The runtime chart reports all measured stages so far; chart/montage
+    # rendering and the final JSON write are excluded to avoid self-reference.
     runtime_total_before_summary = perf_counter() - pipeline_started
     runtime_plot_started = perf_counter()
     plot_runtime_breakdown(
@@ -506,6 +526,8 @@ def main():
 
     # JSON serialization time is reported in the terminal after saving; the
     # JSON records elapsed runtime up to the start of its own write.
+    # Persist timing values before JSON serialization; the write's own duration
+    # is printed afterward because it cannot be contained in the file itself.
     timings["elapsed_before_metrics_json_write"] = perf_counter() - pipeline_started
     with (output_dir / "metrics.json").open("w", encoding="utf-8") as f:
         json.dump(

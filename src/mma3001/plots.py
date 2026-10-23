@@ -8,6 +8,8 @@ import optuna
 # plotting functions in neural_network.py; keep these labels target-agnostic.
 
 def plot_predictions(y_true, y_pred, title):
+    # Metrics are computed from the supplied partition only; the diagonal is
+    # a visual agreement reference and makes no fitted-line assumption.
     mse = mean_squared_error(y_true, y_pred)
     mae = mean_absolute_error(y_true, y_pred)
     r2 = r2_score(y_true, y_pred)
@@ -44,6 +46,8 @@ def plot_sweep_results(results_df):
     plt.bar(x_indices + bar_width/2, results_df['val_mse'], width=bar_width, label='Validation MSE', color='darkorange', alpha=0.85)
 
     plt.xticks(x_indices, results_df['Arch_Str'], rotation=90, fontsize=9)
+    # Sweep errors span a narrow range across orders of magnitude, so a log
+    # axis exposes differences that a linear scale can visually flatten.
     plt.yscale('log')
     plt.xlabel('Hidden Layer Architecture (Layers, Nodes)', fontweight='bold')
     plt.ylabel('Mean Squared Error (Log Scale)', fontweight='bold')
@@ -58,6 +62,8 @@ def plot_optuna_convergence(study):
     trial_numbers = [t.number for t in trials if t.state == optuna.trial.TrialState.COMPLETE]
     validation_mses = [t.value for t in trials if t.state == optuna.trial.TrialState.COMPLETE]
 
+    # Track the incumbent minimum after each completed trial to show whether
+    # additional search budget is still improving the validation objective.
     running_minimums = []
     current_min = float('inf')
     for val in validation_mses:

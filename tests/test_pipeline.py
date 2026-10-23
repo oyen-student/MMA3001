@@ -35,6 +35,8 @@ def cli_environment(project_root):
 
 def write_mat(path: Path, X, coefficients):
     """Write arrays using the same orientation as the real MATLAB dataset."""
+    # Preserve MATLAB's features-by-samples layout so the loader's transpose
+    # is exercised just as it is with the downloaded archive.
     scipy.io.savemat(
         path,
         {
@@ -88,6 +90,8 @@ def test_rejects_mismatched_hull_counts(tmp_path):
 def test_duplicate_design_audit_detects_duplicates_across_partitions(synthetic_mat):
     path, X, coefficients = synthetic_mat
     indices = np.arange(X.shape[1])
+    # Recreate the loader's seeded two-stage split to place duplicates on
+    # opposite sides of a partition boundary deterministically.
     train_val_idx, test_idx = train_test_split(
         indices, test_size=0.20, random_state=42
     )
@@ -207,6 +211,8 @@ def test_cli_smoke_run_without_real_dataset(tmp_path, synthetic_mat):
     path, _, _ = synthetic_mat
     project_root = Path(__file__).resolve().parents[1]
     output_dir = tmp_path / "smoke_outputs"
+    # Run the real CLI entry path with a small fixture and keep its plots out
+    # of the repository by writing into pytest's temporary directory.
     env = cli_environment(project_root)
     env["MPLBACKEND"] = "Agg"
     result = subprocess.run(
