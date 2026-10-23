@@ -77,6 +77,8 @@ def load_and_preprocess_data(
     if not path.is_file():
         raise FileNotFoundError(f"MATLAB dataset not found: {path}")
 
+    # Load only the requested MATLAB archive, then check required keys before
+    # indexing so an unexpected archive fails with a useful message.
     mat_data = scipy.io.loadmat(path)
     required = ("variablesMatrix", "coefStatMatrix")
     missing = [key for key in required if key not in mat_data]
@@ -106,6 +108,8 @@ def load_and_preprocess_data(
     X = raw_x.T
     y = raw_y[target_row, :]
 
+    # Fail instead of imputing: silent repairs would alter the dataset and
+    # make the reported split and model results harder to reproduce.
     if not np.isfinite(X).all() or not np.isfinite(y).all():
         raise ValueError(
             "Dataset contains NaN or infinite values. Investigate these records "
@@ -180,7 +184,8 @@ def load_and_preprocess_data(
         "near_duplicates_audited": False,
     }
 
-    # Fit preprocessing on training data only.
+    # Fit preprocessing on training data only. Validation and test samples
+    # are transformed with these statistics, avoiding information leakage.
     x_scaler = StandardScaler().fit(X_train)
     y_scaler = StandardScaler().fit(y_train.reshape(-1, 1))
 
@@ -193,6 +198,8 @@ def load_and_preprocess_data(
     # Test targets remain in original units: they never affect fitting, early
     # stopping, or hyperparameter selection.
 
+    # The archive identifies normalized design parameters by position rather
+    # than giving a verified physical name for each one.
     feature_names = [f"Param_{i + 1}" for i in range(X.shape[1])]
     return {
         "X_train": X_train_scaled,

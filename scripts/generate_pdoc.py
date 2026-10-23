@@ -11,6 +11,8 @@ import sys
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Keep documentation paths anchored to this script so invocation from another
+# current directory still writes into the repository's docs tree.
 SOURCE_DIRECTORY = PROJECT_ROOT / "src"
 OUTPUT_DIRECTORY = PROJECT_ROOT / "docs" / "api"
 MODULES = (

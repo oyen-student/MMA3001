@@ -61,6 +61,7 @@ def synthetic_mat(tmp_path):
 
 
 def test_preprocessing_shapes_and_split_sizes(synthetic_mat):
+    """Check MATLAB orientation, sample accounting, dtype, and row metadata."""
     path, X, _ = synthetic_mat
     data = load_and_preprocess_data(path, target_row=0)
     assert data["X_train"].shape[1] == X.shape[0]
@@ -75,12 +76,14 @@ def test_preprocessing_shapes_and_split_sizes(synthetic_mat):
 
 @pytest.mark.parametrize("target_row", [-1, 2, 99])
 def test_rejects_target_row_out_of_bounds(synthetic_mat, target_row):
+    """Reject negative and too-large coefficient row selections."""
     path, _, _ = synthetic_mat
     with pytest.raises(ValueError, match="target_row"):
         load_and_preprocess_data(path, target_row=target_row)
 
 
 def test_rejects_mismatched_hull_counts(tmp_path):
+    """Fail early when feature and coefficient matrices describe different hull counts."""
     path = tmp_path / "bad_shapes.mat"
     write_mat(path, np.ones((3, 10)), np.ones((2, 9)))
     with pytest.raises(ValueError, match="hull counts differ"):
@@ -88,6 +91,7 @@ def test_rejects_mismatched_hull_counts(tmp_path):
 
 
 def test_duplicate_design_audit_detects_duplicates_across_partitions(synthetic_mat):
+    """Report exact duplicate feature vectors that land in separate splits."""
     path, X, coefficients = synthetic_mat
     indices = np.arange(X.shape[1])
     # Recreate the loader's seeded two-stage split to place duplicates on
@@ -114,6 +118,7 @@ def test_duplicate_design_audit_detects_duplicates_across_partitions(synthetic_m
 
 @pytest.mark.parametrize("bad_value", [np.nan, np.inf, -np.inf])
 def test_rejects_non_finite_features(tmp_path, bad_value):
+    """Do not allow NaN or infinite feature values into scaling or training."""
     X = np.ones((3, 12))
     X[1, 4] = bad_value
     path = tmp_path / "nonfinite_x.mat"
@@ -124,6 +129,7 @@ def test_rejects_non_finite_features(tmp_path, bad_value):
 
 @pytest.mark.parametrize("bad_value", [np.nan, np.inf, -np.inf])
 def test_rejects_non_finite_targets(tmp_path, bad_value):
+    """Do not allow NaN or infinite targets into scaling or model selection."""
     y = np.ones((2, 12))
     y[0, 4] = bad_value
     path = tmp_path / "nonfinite_y.mat"
@@ -133,6 +139,7 @@ def test_rejects_non_finite_targets(tmp_path, bad_value):
 
 
 def test_scalers_are_fitted_on_training_partition_only(synthetic_mat):
+    """Prove that extreme held-out samples cannot affect fitted scaler statistics."""
     path, X, coefficients = synthetic_mat
     seed = 17
     test_size, val_size = 0.20, 0.10
@@ -164,11 +171,13 @@ def test_scalers_are_fitted_on_training_partition_only(synthetic_mat):
 
 
 def test_tuning_rejects_zero_trials_before_training():
+    """Validate impossible tuning budgets before touching model inputs."""
     with pytest.raises(ValueError, match="n_trials must be at least 1"):
         run_bayesian_search(None, None, None, None, None, n_trials=0)
 
 
 def test_legacy_loader_fails_instead_of_synthesizing_missing_data(tmp_path):
+    """Keep deprecated imports safe by requiring a real dataset file."""
     from mma3001.legacy import load_and_preprocess_data as legacy_loader
 
     with pytest.warns(DeprecationWarning):
@@ -177,6 +186,7 @@ def test_legacy_loader_fails_instead_of_synthesizing_missing_data(tmp_path):
 
 
 def test_mlp_training_and_prediction_interface(synthetic_mat):
+    """Exercise short MLP fitting, best-checkpoint tracking, and inverse scaling."""
     path, _, _ = synthetic_mat
     data = load_and_preprocess_data(path, target_row=0, random_state=7)
     model, history = train_optimized_mlp(
@@ -198,6 +208,7 @@ def test_mlp_training_and_prediction_interface(synthetic_mat):
 
 
 def test_regression_metrics_known_values():
+    """Check reported metrics against a small result with hand-computable values."""
     actual = np.array([1.0, 2.0, 3.0])
     predicted = np.array([1.0, 2.0, 2.0])
     metrics = regression_metrics(actual, predicted)
@@ -208,6 +219,7 @@ def test_regression_metrics_known_values():
 
 
 def test_cli_smoke_run_without_real_dataset(tmp_path, synthetic_mat):
+    """Run the packaged CLI end to end using a temporary synthetic MAT file."""
     path, _, _ = synthetic_mat
     project_root = Path(__file__).resolve().parents[1]
     output_dir = tmp_path / "smoke_outputs"
@@ -251,6 +263,7 @@ def test_cli_smoke_run_without_real_dataset(tmp_path, synthetic_mat):
 
 
 def test_cli_rejects_zero_optuna_trials(synthetic_mat):
+    """Ensure argparse reports an invalid trial count as a usage error."""
     path, _, _ = synthetic_mat
     project_root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
@@ -273,6 +286,7 @@ def test_cli_rejects_zero_optuna_trials(synthetic_mat):
     ],
 )
 def test_cli_rejects_nonfinite_training_settings(synthetic_mat, option, value, error):
+    """Reject non-finite early-stop and gradient-clipping arguments at the CLI."""
     path, _, _ = synthetic_mat
     project_root = Path(__file__).resolve().parents[1]
     result = subprocess.run(

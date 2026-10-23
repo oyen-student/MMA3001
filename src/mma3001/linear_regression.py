@@ -4,7 +4,11 @@ from sklearn.linear_model import LinearRegression
 
 
 class MeanBaseline:
-    """Predict the training-set mean for every sample."""
+    """Predict the training-set mean for every sample.
+
+    This baseline contains no feature dependence. It provides a reference for
+    whether the input variables improve on predicting a constant target value.
+    """
 
     def fit(self, X, y):
         """Store the mean of the supplied training targets.

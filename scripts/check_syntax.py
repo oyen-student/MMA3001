@@ -5,6 +5,8 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Exclude generated environments and build products so the scan covers project
+# source, tests, and scripts without parsing copied third-party packages.
 EXCLUDED_DIRECTORIES = {
     ".git", ".venv", "venv", "__pycache__", "build", "dist", ".pytest_cache"
 }
@@ -12,6 +14,8 @@ EXCLUDED_DIRECTORIES = {
 
 def main():
     """Parse every project Python file outside generated/vendor directories."""
+    # Collect paths first, then parse without importing modules or generating
+    # bytecode; syntax checking therefore does not require dataset access.
     files = []
     # Parse source and test files directly instead of importing them; this
     # avoids executing pipeline code or requiring the large local dataset.

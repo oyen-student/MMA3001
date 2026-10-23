@@ -28,7 +28,11 @@ from .neural_network import (
 
 
 def _finish_stage(name, started_at, timings):
-    """Record and print elapsed wall-clock time for one pipeline stage."""
+    """Record and print elapsed wall-clock time for one pipeline stage.
+
+    Timing boundaries are owned by the caller so a stage can include both its
+    computation and the files produced as part of that stage.
+    """
     elapsed = perf_counter() - started_at
     timings[name] = elapsed
     print(f"Runtime — {name.replace('_', ' ')}: {elapsed:.2f} s")
@@ -175,6 +179,8 @@ def main():
     parser.add_argument("--output-dir", default="outputs", help="Directory for plots and metrics JSON.")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    # Keep one wall-clock ledger for the run. Each named stage is recorded as
+    # it finishes, then the timing map is included in the machine-readable report.
     pipeline_started = perf_counter()
     timings = {}
 
@@ -192,6 +198,8 @@ def main():
         parser.error("--skip-tuning and --reuse-config cannot be used together.")
     grad_clip = args.grad_clip if args.grad_clip > 0 else None
 
+    # Give a dataset-specific setup message before scipy attempts to open a
+    # missing path, including the expected location and the supported override.
     if not args.data.is_file():
         raise FileNotFoundError(
             f"MATLAB dataset not found: {args.data}\n\n"
@@ -208,6 +216,8 @@ def main():
     _finish_stage("output_directory_setup", stage_started, timings)
 
     stage_started = perf_counter()
+    # Data preparation fixes split membership once and returns scaled feature
+    # matrices plus original-unit targets for interpretable metric reporting.
     data = load_and_preprocess_data(
         args.data,
         target_row=args.target_row,
@@ -244,6 +254,9 @@ def main():
     # These quick file attributes reject most stale cached configs without
     # hashing a potentially gigabyte-sized MAT file; they are not a checksum.
     dataset_stat = args.data.stat()
+    # Store a lightweight run fingerprint with cached Optuna settings. File
+    # size and modification time catch common stale-cache cases but are not a
+    # cryptographic identity check for the full MAT archive.
     config_context = {
         "data_path": str(args.data.resolve()),
         "data_file_size_bytes": dataset_stat.st_size,
@@ -257,6 +270,8 @@ def main():
     }
 
     # Optional architecture sweep: select by validation performance only.
+    # It is a separate experiment from Optuna and does not implicitly replace
+    # the configuration source selected in the following block.
     if args.sweep:
         stage_started = perf_counter()
         sweep_df = run_architecture_sweep(
@@ -275,6 +290,8 @@ def main():
         print("Runtime — architecture sweep: skipped")
 
     # Baselines: constant mean and linear regression.
+    # They establish reference scores using the same training partition and
+    # original target units as the MLP.
     baselines = {}
     results = {}
     # Baselines learn only from the training partition; validation is used for
@@ -300,6 +317,8 @@ def main():
     reused_config_metadata = None
     # Exactly one source supplies the MLP settings: a validated cache, fixed
     # defaults, or a fresh Optuna study. The optional sweep is separate.
+    # A reusable config avoids the expensive search, but it still undergoes
+    # schema, range, and experiment-context checks before model training.
     if args.reuse_config is not None:
         stage_started = perf_counter()
         try:
@@ -315,6 +334,8 @@ def main():
         _finish_stage("reusable_config_loading", stage_started, timings)
         print(f"Reusing Optuna configuration from: {args.reuse_config.resolve()}")
     elif args.skip_tuning:
+        # Fixed defaults provide a quick baseline run when no prior tuned
+        # configuration is available or tuning time is not desired.
         timings["optuna_search"] = 0.0
         timings["optuna_convergence_plot"] = 0.0
         print("Runtime — Optuna search: skipped")
@@ -326,6 +347,8 @@ def main():
         }
         study = None
     else:
+        # Every Optuna trial is evaluated on validation MSE. The winner is
+        # saved with context so a later run can reuse it safely.
         stage_started = perf_counter()
         study = run_bayesian_search(
             X_train, data["y_train_scaled"],
@@ -373,6 +396,11 @@ def main():
         )
         _finish_stage("optuna_convergence_plot", stage_started, timings)
 
+    # Refit the chosen settings from a fresh seeded initialization on the
+    # training split. Validation chooses the checkpoint; test data remains
+    # untouched until the final model and checkpoint are fixed.
+    # Save diagnostics from the final refit, not from any intermediate Optuna
+    # trial, so plots correspond to the model whose test score is reported.
     stage_started = perf_counter()
     model, history = train_optimized_mlp(
         X_train, data["y_train_scaled"],
@@ -415,6 +443,8 @@ def main():
     _finish_stage("training_diagnostic_plots", stage_started, timings)
 
     # Keep test data out of model selection; evaluate each final model here.
+    # Collect every partition's metrics together so the JSON compares models
+    # on consistent splits and records the gap between fit and generalization.
     stage_started = perf_counter()
     # Test metrics are calculated only after configurations and checkpoints
     # have been selected using training/validation data.
@@ -494,6 +524,9 @@ def main():
     )
     _finish_stage("test_diagnostic_plots", stage_started, timings)
 
+    # Measure total elapsed time before rendering the runtime figure; plotting
+    # and montage time are separate stages and cannot be included in their own
+    # bar chart without circular timing.
     runtime_plot_path = output_dir / "runtime_breakdown.png"
     # The runtime chart reports all measured stages so far; chart/montage
     # rendering and the final JSON write are excluded to avoid self-reference.
@@ -505,6 +538,8 @@ def main():
     )
     _finish_stage("runtime_breakdown_plot", runtime_plot_started, timings)
 
+    # Keep a central index of report figures. The montage helper skips optional
+    # figures that were not produced by this run's flags.
     montage_items = [
         (output_dir / "training_loss.png", f"MLP training loss — {comparison_label}"),
         (output_dir / "optuna_convergence.png", f"Optuna convergence — {comparison_label}"),
@@ -529,6 +564,8 @@ def main():
     # Persist timing values before JSON serialization; the write's own duration
     # is printed afterward because it cannot be contained in the file itself.
     timings["elapsed_before_metrics_json_write"] = perf_counter() - pipeline_started
+    # Store provenance beside scores: paths, arguments, environment, split
+    # sizes, target definition, tuning source, and runtime aid later review.
     with (output_dir / "metrics.json").open("w", encoding="utf-8") as f:
         json.dump(
             {

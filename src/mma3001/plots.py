@@ -1,4 +1,9 @@
 
+"""Legacy plotting helpers retained for older notebooks.
+
+The active command-line workflow uses the more explicit plotting functions in
+``neural_network.py``. These helpers remain for compatibility with imports.
+"""
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
@@ -8,6 +13,9 @@ import optuna
 # plotting functions in neural_network.py; keep these labels target-agnostic.
 
 def plot_predictions(y_true, y_pred, title):
+    """Show actual versus predicted values and metrics for one data split."""
+    # Compute metrics on this exact input partition and use the diagonal only
+    # as a visual reference for equality, never as a fitted trend line.
     # Metrics are computed from the supplied partition only; the diagonal is
     # a visual agreement reference and makes no fitted-line assumption.
     mse = mean_squared_error(y_true, y_pred)
@@ -29,6 +37,9 @@ def plot_predictions(y_true, y_pred, title):
     plt.show()
 
 def plot_loss_convergence(loss_history):
+    """Plot a supplied sequence of training losses by epoch."""
+    # This older helper accepts training losses only; it does not select or
+    # annotate a checkpoint because no validation history is passed in.
     plt.figure(figsize=(10, 5))
     plt.plot(range(1, len(loss_history) + 1), loss_history, color='teal', linewidth=2.5)
     plt.title('MLP Neural Network Training Loss Convergence', fontsize=12, fontweight='bold')
@@ -38,6 +49,9 @@ def plot_loss_convergence(loss_history):
     plt.show()
 
 def plot_sweep_results(results_df):
+    """Plot training and validation MSE for legacy architecture-sweep output."""
+    # A logarithmic axis preserves visible separation when MSE values differ
+    # by several orders of magnitude.
     plt.figure(figsize=(16, 7))
     x_indices = np.arange(len(results_df))
     bar_width = 0.35
@@ -58,6 +72,9 @@ def plot_sweep_results(results_df):
     plt.show()
 
 def plot_optuna_convergence(study):
+    """Plot completed Optuna trial scores and the best score found so far."""
+    # Failed/pruned trials have no objective value and are omitted from both
+    # the per-trial markers and the running best line.
     trials = study.trials
     trial_numbers = [t.number for t in trials if t.state == optuna.trial.TrialState.COMPLETE]
     validation_mses = [t.value for t in trials if t.state == optuna.trial.TrialState.COMPLETE]

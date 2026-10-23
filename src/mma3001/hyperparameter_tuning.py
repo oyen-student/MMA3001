@@ -38,6 +38,8 @@ def run_bayesian_search(
     Returns:
         optuna.Study: Completed study; inspect study.best_trial for its winner.
     """
+    # Validate budgets before creating an Optuna study so invalid CLI or API
+    # calls fail immediately instead of appearing to run a search.
     if n_trials < 1:
         raise ValueError("n_trials must be at least 1.")
     if max_epochs < 1:
@@ -49,6 +51,8 @@ def run_bayesian_search(
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
+    # Optuna minimizes validation MSE in physical target units. Its objective
+    # retrains a fresh model for each candidate and never receives test data.
     def objective(trial):
         """Train one suggested configuration and return its validation MSE.
 
@@ -91,6 +95,8 @@ def run_bayesian_search(
         # units is scaled-target MSE multiplied by scale squared. Reusing the
         # restored best epoch's validation loss avoids another model pass over
         # the validation set for every trial.
+        # The trial history stores standardized MSE. Undo target scaling so
+        # search reports and saved metrics use the same units as evaluation.
         validation_mse = history["best_val_loss_scaled"] * float(y_scaler.scale_[0]) ** 2
         print(
             f"Optuna trial {trial.number + 1}/{n_trials}: "
@@ -116,6 +122,8 @@ def best_model_config(study):
         Dictionary containing hidden sizes, learning rate, weight decay,
         and batch size for the selected configuration.
     """
+    # Ignore sampled widths beyond the winning depth; Optuna may have stored
+    # those parameters for other trials, but they are not part of this model.
     params = study.best_trial.params
     n_layers = params["n_layers"]
     return {
@@ -136,6 +144,8 @@ def plot_optuna_convergence(study, save_path=None, title_suffix=None):
     import matplotlib.pyplot as plt
     import numpy as np
 
+    # Trials without an objective value are omitted so the plotted sequence
+    # reflects only configurations that produced a usable validation score.
     completed = [t for t in study.trials if t.value is not None]
     trial_numbers = [t.number + 1 for t in completed]
     values = [t.value for t in completed]

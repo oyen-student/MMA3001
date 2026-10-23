@@ -18,6 +18,8 @@ def set_seed(seed=42):
     Args:
         seed: Integer seed used for reproducible initialisation and sampling.
     """
+    # Seed each library involved in initialization, shuffling, and training.
+    # CUDA generators are only available when PyTorch detects a CUDA device.
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -45,6 +47,8 @@ class PyTorchMLP(nn.Module):
             hidden_sizes: Width of each hidden layer, in order.
         """
         super().__init__()
+        # Add one affine transform and ReLU per hidden layer, then a single
+        # linear output because the target is a continuous scalar.
         layers = []
         in_dim = input_dim
         for width in hidden_sizes:
@@ -126,6 +130,8 @@ def train_optimized_mlp(
         generator=torch.Generator().manual_seed(seed),
     )
     model = PyTorchMLP(X_train.shape[1], hidden_sizes).to(device)
+    # Adam updates parameters from minibatch gradients; weight decay applies a
+    # small penalty to discourage unnecessarily large weights.
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     criterion = nn.MSELoss()
 
@@ -139,10 +145,15 @@ def train_optimized_mlp(
     best_epoch = 0
     epochs_without_improvement = 0
 
+    # Every epoch performs minibatch updates, then measures train and
+    # validation loss with dropout-free/evaluation behavior (the MLP has no
+    # dropout, but eval mode also makes the intent explicit).
     for epoch in range(epochs):
         model.train()
         epoch_grad_norms = []
         for batch_X, batch_y in loader:
+            # Move just the current minibatch to the selected compute device,
+            # calculate gradients, optionally cap their global norm, then step.
             batch_X = batch_X.to(device)
             batch_y = batch_y.to(device)
             optimizer.zero_grad(set_to_none=True)
@@ -170,6 +181,8 @@ def train_optimized_mlp(
         # Validation selects a checkpoint and stopping time; it never supplies
         # gradients. min_delta prevents tiny numerical changes resetting patience.
         if val_loss < best_val - min_delta:
+            # Save a deep copy because state_dict tensors otherwise track the
+            # parameters that subsequent optimizer steps continue to mutate.
             best_val = val_loss
             best_state = deepcopy(model.state_dict())
             best_epoch = epoch + 1
@@ -233,6 +246,8 @@ def plot_training_history(history, save_path=None, title_suffix=None):
         history: History dictionary returned by train_optimized_mlp.
         save_path: Optional path at which to save the figure.
     """
+    # Show optimization progress using training loss only. Validation still
+    # determines which checkpoint is restored, and that epoch is annotated.
     fig, ax = plt.subplots(figsize=(8, 5))
     epochs = np.arange(1, len(history["train_loss"]) + 1)
     ax.plot(epochs, history["train_loss"], label="Training loss", color="#1f77b4")
@@ -268,6 +283,7 @@ def plot_gradient_norms(history, save_path=None, title_suffix=None):
         history: Training-history dictionary containing gradient-norm series.
         save_path: Optional path at which to save the figure.
     """
+    # Older or externally supplied histories may omit this optional diagnostic.
     if not history.get("grad_norm_mean"):
         return
     epochs = np.arange(1, len(history["grad_norm_mean"]) + 1)
@@ -297,6 +313,8 @@ def plot_predictions(y_true, y_pred, title="Predicted vs actual", save_path=None
         title: Figure title.
         save_path: Optional path at which to save the figure.
     """
+    # The diagonal is a perfect-agreement reference, not a fitted line; the
+    # statistics below summarize only the partition passed to this function.
     metrics = regression_metrics(y_true, y_pred)
     lo = float(min(np.min(y_true), np.min(y_pred)))
     hi = float(max(np.max(y_true), np.max(y_pred)))
@@ -350,6 +368,8 @@ def plot_train_validation_predictions(
         configuration_source: How the configuration was selected or loaded.
         comparison_label: Dataset condition used in this run.
     """
+    # Normalize input types once so masks and metric calculations behave the
+    # same for lists, NumPy arrays, and pandas-backed callers.
     y_train = np.asarray(y_train)
     train_predictions = np.asarray(train_predictions)
     y_val = np.asarray(y_val)
@@ -357,6 +377,8 @@ def plot_train_validation_predictions(
 
     train_metrics = regression_metrics(y_train, train_predictions)
     val_metrics = regression_metrics(y_val, val_predictions)
+    # Include actuals and predictions from both partitions when setting limits;
+    # otherwise a prediction outside the target range could be clipped.
     all_values = np.concatenate(
         [y_train, train_predictions, y_val, val_predictions]
     )
@@ -370,6 +392,8 @@ def plot_train_validation_predictions(
 
     # Keep the left panel complete; use robust bounds only for the right zoom
     # so extreme values do not compress the dense central cloud.
+    # Percentile limits make the zoom useful for dense regions while retaining
+    # the complete observation count in the separate full-range panel.
     zoom_lo, zoom_hi = np.percentile(all_values, [0.5, 99.5])
     if zoom_hi <= zoom_lo:
         zoom_lo, zoom_hi = lo, hi
@@ -410,6 +434,8 @@ def plot_train_validation_predictions(
         (axes[1], train_in_zoom, val_in_zoom, zoom_lo, zoom_hi,
          "Central range (zoom; clipped counts shown)"),
     )
+    # The two colors identify partition membership. Counts in each legend
+    # disclose how many points the zoomed view clips from its plotting window.
     for ax, train_mask, val_mask, axis_lo, axis_hi, title in views:
         ax.scatter(
             y_train[train_mask],
@@ -469,6 +495,8 @@ def plot_model_comparison(y_true, predictions, save_path=None, title_suffix=None
         predictions: Mapping of model names to predictions in original units.
         save_path: Optional path at which to save the figure.
     """
+    # Shared axes let each model be compared against the same actual values;
+    # per-model metrics are calculated against this same target vector.
     actual = np.asarray(y_true)
     all_values = np.concatenate([actual, *(np.asarray(pred) for pred in predictions.values())])
     lo = float(np.min(all_values))
@@ -512,6 +540,8 @@ def plot_residuals(y_true, y_pred, save_path=None, title_suffix=None):
         y_pred: Predicted target values in original units.
         save_path: Optional path at which to save the figure.
     """
+    # Positive residuals mean underprediction and negative residuals mean
+    # overprediction under the actual-minus-predicted sign convention.
     residuals = np.asarray(y_true) - np.asarray(y_pred)
     fig, ax = plt.subplots(figsize=(7, 5))
     ax.scatter(y_pred, residuals, alpha=0.55, s=18)
@@ -537,6 +567,8 @@ def plot_runtime_breakdown(stage_timings, total_runtime, save_path=None, title_s
         total_runtime: Elapsed pipeline seconds before final report-file writing.
         save_path: Optional path at which to save the figure.
     """
+    # Keep the aggregate out of the stage bars so it is not double-counted;
+    # show total runtime separately in the second panel.
     excluded_keys = {"elapsed_before_metrics_json_write"}
     stages = [
         (name, float(seconds))
@@ -586,6 +618,8 @@ def create_plot_montage(plot_items, save_path, columns=2):
         save_path: Output image path.
         columns: Number of montage columns.
     """
+    # Tuning and sweep figures are optional. Drop missing paths before laying
+    # out the grid so each visible panel corresponds to a real saved plot.
     plot_items = [(path, title) for path, title in plot_items if path.is_file()]
     if not plot_items:
         raise ValueError("No plot images were available to create a montage.")
@@ -644,6 +678,8 @@ def run_architecture_sweep(
     """
     from sklearn.metrics import mean_squared_error
 
+    # The default candidate list keeps the sweep reproducible and bounded;
+    # explicit candidates support smaller, focused architecture comparisons.
     if architectures is None:
         architectures = [
             (32,), (64,), (128,),
@@ -657,6 +693,8 @@ def run_architecture_sweep(
         np.asarray(y_val_scaled).reshape(-1, 1)
     ).ravel()
     rows = []
+    # Use validation error to rank candidates. Distinct seeded initializations
+    # keep results repeatable without giving every architecture identical RNG state.
     for index, architecture in enumerate(architectures):
         architecture_started = perf_counter()
         model, history = train_optimized_mlp(
