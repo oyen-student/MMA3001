@@ -56,7 +56,12 @@ Useful evaluation artefacts include:
 - residual/error diagnostics where appropriate,
 - machine-readable metrics such as JSON.
 
-Do not hardcode historical model scores as if freshly reproduced. Prior outputs reported approximate values (mean baseline RMSE 0.000467, R² -0.0016; linear regression RMSE 0.000420, R² 0.192; tuned MLP RMSE 0.000283, R² 0.632; another fixed/tuned MLP run RMSE about 0.000231–0.000232 and R² about 0.752–0.756). These are historical artefacts and have not been independently reproduced in the current session. Re-run the pipeline before relying on them in a report.
+Do not hardcode historical model scores as if freshly reproduced. The checked-in historical result files currently show these held-out test values:
+- `outputs/metrics.json`: mean baseline RMSE 0.000467314848, R² -0.001628477; linear regression RMSE 0.000419665188, R² 0.192219448; tuned MLP RMSE 0.000283276196, R² 0.631949285. Its selected MLP configuration is hidden sizes [128, 128, 64], learning rate 0.000892980068, weight decay 0.000142935843, batch size 64, best epoch 100.
+- `outputs_stability_experiment/metrics.json`: fixed MLP RMSE 0.000230800739, R² 0.755678384; hidden sizes [64, 32], learning rate 0.001, weight decay 0.0001, batch size 64, best epoch 24.
+- `outputs_stability_tuned/metrics.json`: tuned MLP RMSE 0.000232302917, R² 0.752487675; hidden sizes [32, 64, 96], learning rate 0.002154194634, weight decay 0.000053278272, batch size 32, best epoch 91.
+
+I compared these values with their JSON metric/configuration fields and checked the saved Optuna configurations against matching `best_config.json` files where available. These remain historical artefacts, not fresh results. Their older JSON files lack some current run-provenance fields, so re-run the pipeline and record its command, environment, and output folder before relying on any score in a report.
 
 ## Repository and branch context
 

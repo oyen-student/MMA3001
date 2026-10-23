@@ -36,6 +36,15 @@ network, hyperparameter tuning, plotting, and the legacy data-preparation
 compatibility wrapper. `pdoc` is listed in `requirements-dev.txt` because it is
 only needed to build documentation, not to run the modeling pipeline.
 
+## License and dataset terms
+
+The original project code and documentation are licensed under the MIT
+License; see [LICENSE](LICENSE). The downloaded DTMB 5415 dataset is a separate
+third-party work and is identified as CC BY 4.0 in its
+[Zenodo record](https://zenodo.org/records/19222008). It is not included in
+this repository or relicensed under MIT. See [DATA_LICENSE.md](DATA_LICENSE.md)
+for the dataset citation and reuse terms.
+
 ## Dataset download and setup
 
 The MATLAB dataset is approximately 1 GB, so it is **not stored in this GitHub repository**. Download it separately from Zenodo:
