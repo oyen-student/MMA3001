@@ -240,11 +240,4 @@ The output directory defaults to `outputs/` and contains:
 7. **Reproducibility:** the train/validation/test split and PyTorch/Optuna sampling use fixed seeds by default.
 8. **Interpretation limits:** this implementation uses a random sample-level split and reports exact duplicate design vectors crossing partitions. Near duplicates are not measured because there is no justified tolerance, and no hull-family labels are available for a group-aware split. The score estimates performance on this split, not necessarily on genuinely unseen hull families.
 
-## Before writing conclusions
 
-- Cite the included dataset `metadata.txt` for row identity and scale; verify against the dataset publication if independent confirmation is required.
-- Find the definitions and units for each input variable. The generic names are not physical explanations.
-- Inspect exact-duplicate audit counts in `metrics.json`; choose and justify a near-duplicate tolerance and obtain hull-family labels before claiming generalization to new hull families.
-- Compare the mean baseline, linear model, and MLP test results. A neural network is not automatically better.
-- Do not claim Optuna found a global optimum; it finds the best configuration among the trials performed.
-- Treat checked-in output folders as saved experiment artifacts, not freshly reproduced results. A new reportable run should record its command, seed, target row, split sizes, tuning settings, environment, metrics, and output directory.
