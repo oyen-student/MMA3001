@@ -16,6 +16,22 @@ This repository compares simple regression baselines with a PyTorch multilayer p
 For the module map, data/model-selection boundaries, training lifecycle, and
 Mermaid flow charts, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
+### HTML API documentation
+
+The project also provides browsable HTML documentation for the pipeline
+modules, generated with Python's standard-library `pydoc` (no extra package is
+needed). From the repository root, run:
+
+```bash
+python generate_pydoc.py
+```
+
+Open [`docs/api/index.html`](docs/api/index.html) in a browser to browse the
+module reference. Run the generator again after changing module docstrings or
+public functions to refresh the HTML pages. The generated pages cover the CLI,
+data preparation, linear regression, the neural network, hyperparameter
+tuning, plotting, and the legacy data-preparation compatibility wrapper.
+
 ## Dataset download and setup
 
 The MATLAB dataset is approximately 1 GB, so it is **not stored in this GitHub repository**. Download it separately from Zenodo:

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module hyperparameter_tuning</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title">hyperparameter_tuning</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:c%3A%5Cusers%5Corlando%5Conedrive%5Cdocuments%5Cmma3001%5Cproject%5Cmma3001%5Chyperparameter_tuning.py">c:\users\orlando\onedrive\documents\mma3001\project\mma3001\hyperparameter_tuning.py</a></td></tr></table>
+    <p><span class="code">Optuna&nbsp;search&nbsp;using&nbsp;the&nbsp;same&nbsp;PyTorch&nbsp;model&nbsp;and&nbsp;validation&nbsp;procedure.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="optuna.html">optuna</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-best_model_config"><strong>best_model_config</strong></a>(study)</dt><dd><span class="code">Convert&nbsp;the&nbsp;best&nbsp;Optuna&nbsp;trial&nbsp;into&nbsp;model-training&nbsp;arguments.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;study:&nbsp;Completed&nbsp;study&nbsp;returned&nbsp;by&nbsp;run_bayesian_search.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Dictionary&nbsp;containing&nbsp;hidden&nbsp;sizes,&nbsp;learning&nbsp;rate,&nbsp;weight&nbsp;decay,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;batch&nbsp;size&nbsp;for&nbsp;the&nbsp;selected&nbsp;configuration.</span></dd></dl>
+ <dl><dt><a name="-perf_counter"><strong>perf_counter</strong></a>(...)</dt><dd><span class="code"><a href="#-perf_counter">perf_counter</a>()&nbsp;-&gt;&nbsp;float<br>
+&nbsp;<br>
+Performance&nbsp;counter&nbsp;for&nbsp;benchmarking.</span></dd></dl>
+ <dl><dt><a name="-plot_optuna_convergence"><strong>plot_optuna_convergence</strong></a>(study, save_path=None, title_suffix=None)</dt><dd><span class="code">Plot&nbsp;individual&nbsp;Optuna&nbsp;scores&nbsp;and&nbsp;the&nbsp;best&nbsp;validation&nbsp;score&nbsp;so&nbsp;far.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;study:&nbsp;Optuna&nbsp;study&nbsp;containing&nbsp;trial&nbsp;results.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;save_path:&nbsp;Optional&nbsp;path&nbsp;at&nbsp;which&nbsp;to&nbsp;save&nbsp;the&nbsp;figure.</span></dd></dl>
+ <dl><dt><a name="-run_bayesian_search"><strong>run_bayesian_search</strong></a>(X_train, y_train_scaled, X_val, y_val_scaled, y_scaler, n_trials=20, max_epochs=500, patience=50, min_delta=1e-06, grad_clip=1.0, seed=42)</dt><dd><span class="code">Search&nbsp;MLP&nbsp;hyperparameters&nbsp;using&nbsp;validation&nbsp;MSE&nbsp;in&nbsp;original&nbsp;target&nbsp;units.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;X_train&nbsp;(array-like):&nbsp;Training&nbsp;features&nbsp;scaled&nbsp;using&nbsp;training-only&nbsp;statistics.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;y_train_scaled&nbsp;(array-like):&nbsp;Scaled&nbsp;training&nbsp;targets.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;X_val&nbsp;(array-like):&nbsp;Validation&nbsp;features&nbsp;transformed&nbsp;using&nbsp;the&nbsp;training&nbsp;scaler.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;y_val_scaled&nbsp;(array-like):&nbsp;Validation&nbsp;targets&nbsp;transformed&nbsp;using&nbsp;the&nbsp;training&nbsp;scaler.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;y_scaler&nbsp;(StandardScaler):&nbsp;Fitted&nbsp;scaler&nbsp;used&nbsp;for&nbsp;original-unit&nbsp;metrics.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_trials&nbsp;(int):&nbsp;Number&nbsp;of&nbsp;Optuna&nbsp;configurations&nbsp;to&nbsp;evaluate.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_epochs&nbsp;(int):&nbsp;Maximum&nbsp;training&nbsp;epochs&nbsp;per&nbsp;trial.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;patience&nbsp;(int):&nbsp;Early-stopping&nbsp;patience&nbsp;per&nbsp;trial.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;min_delta&nbsp;(float):&nbsp;Minimum&nbsp;scaled&nbsp;validation-MSE&nbsp;improvement&nbsp;to&nbsp;reset&nbsp;patience.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;grad_clip&nbsp;(float&nbsp;or&nbsp;None):&nbsp;Maximum&nbsp;global&nbsp;gradient&nbsp;norm;&nbsp;None&nbsp;disables&nbsp;clipping.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;seed&nbsp;(int):&nbsp;Seed&nbsp;for&nbsp;Optuna&nbsp;sampling&nbsp;and&nbsp;model&nbsp;training.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;optuna.Study:&nbsp;Completed&nbsp;study;&nbsp;inspect&nbsp;study.best_trial&nbsp;for&nbsp;its&nbsp;winner.</span></dd></dl>
+</td></tr></table>
+</body></html>

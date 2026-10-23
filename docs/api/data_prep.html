@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module data_prep</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title">data_prep</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:c%3A%5Cusers%5Corlando%5Conedrive%5Cdocuments%5Cmma3001%5Cproject%5Cmma3001%5Cdata_prep.py">c:\users\orlando\onedrive\documents\mma3001\project\mma3001\data_prep.py</a></td></tr></table>
+    <p><span class="code">Load&nbsp;the&nbsp;DTMB&nbsp;5415&nbsp;MATLAB&nbsp;dataset&nbsp;and&nbsp;create&nbsp;leakage-safe&nbsp;data&nbsp;splits.<br>
+&nbsp;<br>
+IMPORTANT:&nbsp;target_row&nbsp;defaults&nbsp;to&nbsp;0&nbsp;only&nbsp;as&nbsp;a&nbsp;configurable&nbsp;starting&nbsp;point.&nbsp;Verify<br>
+the&nbsp;physical&nbsp;meaning&nbsp;of&nbsp;coefStatMatrix&nbsp;rows&nbsp;against&nbsp;the&nbsp;dataset&nbsp;documentation.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"><a href="pandas.html">pandas</a><br>
+</td><td class="multicolumn"><a href="scipy.html">scipy</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-load_and_preprocess_data"><strong>load_and_preprocess_data</strong></a>(mat_file_path, target_row=0, test_size=0.2, val_size=0.1, random_state=42, exclude_training_sample_indices=())</dt><dd><span class="code">Load&nbsp;the&nbsp;MATLAB&nbsp;database&nbsp;and&nbsp;prepare&nbsp;leakage-safe&nbsp;data&nbsp;partitions.<br>
+&nbsp;<br>
+Features&nbsp;are&nbsp;transposed&nbsp;so&nbsp;each&nbsp;row&nbsp;represents&nbsp;one&nbsp;hull.&nbsp;The&nbsp;test&nbsp;split&nbsp;is<br>
+separated&nbsp;before&nbsp;the&nbsp;scalers&nbsp;are&nbsp;fitted;&nbsp;validation&nbsp;size&nbsp;is&nbsp;expressed&nbsp;as&nbsp;a<br>
+fraction&nbsp;of&nbsp;the&nbsp;complete&nbsp;dataset.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mat_file_path&nbsp;(str&nbsp;or&nbsp;Path):&nbsp;Path&nbsp;to&nbsp;DTMB5415-database.mat.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target_row&nbsp;(int):&nbsp;Row&nbsp;index&nbsp;from&nbsp;coefStatMatrix&nbsp;to&nbsp;predict.&nbsp;Verify&nbsp;its<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;physical&nbsp;definition&nbsp;in&nbsp;the&nbsp;dataset&nbsp;documentation&nbsp;before&nbsp;interpreting<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;results.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;test_size&nbsp;(float):&nbsp;Fraction&nbsp;of&nbsp;all&nbsp;samples&nbsp;reserved&nbsp;for&nbsp;the&nbsp;held-out&nbsp;test&nbsp;set.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;val_size&nbsp;(float):&nbsp;Fraction&nbsp;of&nbsp;all&nbsp;samples&nbsp;reserved&nbsp;for&nbsp;validation.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;random_state&nbsp;(int):&nbsp;Seed&nbsp;controlling&nbsp;reproducible&nbsp;random&nbsp;splitting.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;exclude_training_sample_indices&nbsp;(iterable[int]):&nbsp;Optional&nbsp;zero-based<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;source&nbsp;sample&nbsp;indices&nbsp;to&nbsp;omit&nbsp;from&nbsp;training&nbsp;after&nbsp;the&nbsp;split&nbsp;is&nbsp;made.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Validation&nbsp;and&nbsp;test&nbsp;membership&nbsp;remain&nbsp;unchanged.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dict:&nbsp;Scaled&nbsp;feature&nbsp;arrays,&nbsp;original&nbsp;and&nbsp;scaled&nbsp;target&nbsp;arrays,&nbsp;fitted<br>
+&nbsp;&nbsp;&nbsp;&nbsp;scalers,&nbsp;feature&nbsp;labels,&nbsp;target-row&nbsp;metadata,&nbsp;and&nbsp;split&nbsp;sizes.&nbsp;Scaled<br>
+&nbsp;&nbsp;&nbsp;&nbsp;test&nbsp;features&nbsp;are&nbsp;returned&nbsp;for&nbsp;consistent&nbsp;preprocessing;&nbsp;scaled&nbsp;test<br>
+&nbsp;&nbsp;&nbsp;&nbsp;targets&nbsp;are&nbsp;intentionally&nbsp;not&nbsp;used&nbsp;for&nbsp;model&nbsp;selection.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;FileNotFoundError:&nbsp;If&nbsp;the&nbsp;requested&nbsp;MAT&nbsp;file&nbsp;does&nbsp;not&nbsp;exist.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;KeyError:&nbsp;If&nbsp;required&nbsp;arrays&nbsp;are&nbsp;absent&nbsp;from&nbsp;the&nbsp;MAT&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ValueError:&nbsp;If&nbsp;array&nbsp;dimensions,&nbsp;sample&nbsp;counts,&nbsp;split&nbsp;sizes,&nbsp;or&nbsp;values<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;are&nbsp;invalid.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TARGET_ROW_DEFINITIONS</strong> = {0: {'froude_number': 0.25, 'quantity': 'Wave resistance coefficient (Cw)', 'scale': 'model scale', 'source': 'DTMB5415 dataset metadata.txt (included with the dataset archive)'}, 1: {'froude_number': 0.33, 'quantity': 'Wave resistance coefficient (Cw)', 'scale': 'model scale', 'source': 'DTMB5415 dataset metadata.txt (included with the dataset archive)'}, 2: {'froude_number': 0.41, 'quantity': 'Wave resistance coefficient (Cw)', 'scale': 'model scale', 'source': 'DTMB5415 dataset metadata.txt (included with the dataset archive)'}}</td></tr></table>
+</body></html>
