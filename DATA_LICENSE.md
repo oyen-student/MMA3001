@@ -1,8 +1,11 @@
 # Dataset license and attribution
 
 The DTMB 5415 dataset is a third-party work. It is not covered by this
-repository's MIT license, and the dataset archive is intentionally not
-committed here.
+repository's PolyForm Noncommercial license, and the dataset archive is
+intentionally not committed here. The project's license does not change the
+dataset's separate terms. CC BY 4.0 does not impose a noncommercial
+restriction; commercial reuse may be permitted when its attribution and other
+license requirements are followed.
 
 The [Zenodo record](https://zenodo.org/records/19222008) metadata identifies
 the dataset license as **Creative Commons Attribution 4.0 International

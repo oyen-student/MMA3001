@@ -38,12 +38,20 @@ only needed to build documentation, not to run the modeling pipeline.
 
 ## License and dataset terms
 
-The original project code and documentation are licensed under the MIT
-License; see [LICENSE](LICENSE). The downloaded DTMB 5415 dataset is a separate
-third-party work and is identified as CC BY 4.0 in its
-[Zenodo record](https://zenodo.org/records/19222008). It is not included in
-this repository or relicensed under MIT. See [DATA_LICENSE.md](DATA_LICENSE.md)
-for the dataset citation and reuse terms.
+The original project code and documentation are licensed under the
+[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/);
+see [LICENSE](LICENSE). This license restricts use of the project code and
+documentation to its permitted purposes and does not grant general permission
+for commercial use. It includes specific permitted-use provisions for certain
+educational, charitable, public research, and similar organizations; read the
+license for the exact scope.
+
+The downloaded DTMB 5415 dataset is a separate third-party work identified as
+CC BY 4.0 in its [Zenodo record](https://zenodo.org/records/19222008). It is
+not included in this repository and is not covered by the project's
+Noncommercial license. CC BY 4.0 has its own reuse terms, which can permit
+commercial reuse with attribution. See [DATA_LICENSE.md](DATA_LICENSE.md) for
+the dataset citation and terms.
 
 ## Dataset download and setup
 
