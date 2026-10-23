@@ -14,13 +14,23 @@ import scipy.io
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from data_prep import load_and_preprocess_data
-from hyperparameter_tuning import run_bayesian_search
-from neural_network import (
+from mma3001.data_prep import load_and_preprocess_data
+from mma3001.hyperparameter_tuning import run_bayesian_search
+from mma3001.neural_network import (
     evaluate_pytorch_model,
     regression_metrics,
     train_optimized_mlp,
 )
+
+
+def cli_environment(project_root):
+    """Expose the src-layout package to CLI subprocesses during local tests."""
+    environment = os.environ.copy()
+    source_path = str(project_root / "src")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value for value in (source_path, environment.get("PYTHONPATH")) if value
+    )
+    return environment
 
 
 def write_mat(path: Path, X, coefficients):
@@ -155,7 +165,7 @@ def test_tuning_rejects_zero_trials_before_training():
 
 
 def test_legacy_loader_fails_instead_of_synthesizing_missing_data(tmp_path):
-    from src.data_prep import load_and_preprocess_data as legacy_loader
+    from mma3001.legacy import load_and_preprocess_data as legacy_loader
 
     with pytest.warns(DeprecationWarning):
         with pytest.raises(FileNotFoundError):
@@ -197,11 +207,11 @@ def test_cli_smoke_run_without_real_dataset(tmp_path, synthetic_mat):
     path, _, _ = synthetic_mat
     project_root = Path(__file__).resolve().parents[1]
     output_dir = tmp_path / "smoke_outputs"
-    env = os.environ.copy()
+    env = cli_environment(project_root)
     env["MPLBACKEND"] = "Agg"
     result = subprocess.run(
         [
-            sys.executable, str(project_root / "main.py"),
+            sys.executable, "-m", "mma3001",
             "--data", str(path),
             "--target-row", "0",
             "--skip-tuning",
@@ -238,8 +248,9 @@ def test_cli_rejects_zero_optuna_trials(synthetic_mat):
     path, _, _ = synthetic_mat
     project_root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
-        [sys.executable, str(project_root / "main.py"), "--data", str(path), "--trials", "0"],
+        [sys.executable, "-m", "mma3001", "--data", str(path), "--trials", "0"],
         cwd=project_root,
+        env=cli_environment(project_root),
         capture_output=True,
         text=True,
         timeout=30,
@@ -259,8 +270,9 @@ def test_cli_rejects_nonfinite_training_settings(synthetic_mat, option, value, e
     path, _, _ = synthetic_mat
     project_root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
-        [sys.executable, str(project_root / "main.py"), "--data", str(path), option, value],
+        [sys.executable, "-m", "mma3001", "--data", str(path), option, value],
         cwd=project_root,
+        env=cli_environment(project_root),
         capture_output=True,
         text=True,
         timeout=30,

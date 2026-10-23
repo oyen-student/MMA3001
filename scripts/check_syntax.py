@@ -4,8 +4,10 @@ import os
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-EXCLUDED_DIRECTORIES = {".git", ".venv", "venv", "__pycache__", "build", "dist"}
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+EXCLUDED_DIRECTORIES = {
+    ".git", ".venv", "venv", "__pycache__", "build", "dist", ".pytest_cache"
+}
 
 
 def main():

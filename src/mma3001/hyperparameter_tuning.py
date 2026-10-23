@@ -4,7 +4,7 @@ from time import perf_counter
 
 import optuna
 
-from neural_network import train_optimized_mlp
+from .neural_network import train_optimized_mlp
 
 
 def run_bayesian_search(

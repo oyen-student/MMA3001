@@ -1,16 +1,16 @@
-"""Compatibility wrapper for the canonical project-root data loader.
+"""Compatibility wrapper for the canonical package data loader.
 
 The old implementation could silently substitute random values when the MAT
 file was missing. This module now delegates to :mod:`data_prep`, which raises
 an error for missing or invalid input and uses the same split/scaling logic as
-the main CLI. New code should import from the project-root ``data_prep``.
+the main CLI. New code should import from :mod:`mma3001.data_prep`.
 """
 from pathlib import Path
 import warnings
 
 import pandas as pd
 
-from data_prep import load_and_preprocess_data as _load_and_preprocess_data
+from .data_prep import load_and_preprocess_data as _load_and_preprocess_data
 
 
 def load_and_preprocess_data(mat_file_path, output_dir=None, **kwargs):
@@ -26,8 +26,8 @@ def load_and_preprocess_data(mat_file_path, output_dir=None, **kwargs):
         target splits. No synthetic or fallback dataset is ever generated.
     """
     warnings.warn(
-        "src.data_prep is deprecated; import load_and_preprocess_data from "
-        "the project-root data_prep module instead.",
+        "mma3001.legacy is deprecated; import load_and_preprocess_data from "
+        "mma3001.data_prep instead.",
         DeprecationWarning,
         stacklevel=2,
     )

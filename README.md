@@ -2,15 +2,15 @@
 
 This repository compares simple regression baselines with a PyTorch multilayer perceptron (MLP) for predicting a selected row of `coefStatMatrix` from the DTMB 5415 hull parameter matrix.
 
-`data_prep.py` uses zero-based Python row indices. The `metadata.txt` included in the dataset archive maps `coefStatMatrix` rows 1-3 to model-scale wave-resistance coefficient (`Cw`) at Froude numbers 0.25, 0.33, and 0.41. Thus `--target-row 0` means `Cw` at Fr=0.25, according to that metadata. The result JSON records this definition and its source. The 27 inputs remain normalized design variables; individual variable meanings and units are not established by the metadata inspected here.
+`mma3001.data_prep` uses zero-based Python row indices. The `metadata.txt` included in the dataset archive maps `coefStatMatrix` rows 1-3 to model-scale wave-resistance coefficient (`Cw`) at Froude numbers 0.25, 0.33, and 0.41. Thus `--target-row 0` means `Cw` at Fr=0.25, according to that metadata. The result JSON records this definition and its source. The 27 inputs remain normalized design variables; individual variable meanings and units are not established by the metadata inspected here.
 
 ## Pipeline
 
-- `data_prep.py`: validates MAT-file keys/shapes and finite values; creates reproducible random sample-level train/validation/test splits; fits feature and target standardisers on training data only; records the target-row definition; and audits exact duplicate design vectors across splits.
-- `linear_regression.py`: mean-target sanity baseline and linear-regression baseline.
-- `neural_network.py`: PyTorch MLP, reproducible training, post-epoch train/validation loss measured in evaluation mode, configurable gradient clipping, pre-clipping gradient-norm diagnostics, early stopping, best-checkpoint restoration, regression metrics, and diagnostic plots.
-- `hyperparameter_tuning.py`: Optuna TPE search over MLP architecture, learning rate, weight decay, and batch size using validation MSE in original target units.
-- `main.py`: complete experiment, held-out test evaluation, and output saving.
+- `src/mma3001/data_prep.py`: validates MAT-file keys/shapes and finite values; creates reproducible random sample-level train/validation/test splits; fits feature and target standardisers on training data only; records the target-row definition; and audits exact duplicate design vectors across splits.
+- `src/mma3001/linear_regression.py`: mean-target sanity baseline and linear-regression baseline.
+- `src/mma3001/neural_network.py`: PyTorch MLP, reproducible training, post-epoch train/validation loss measured in evaluation mode, configurable gradient clipping, pre-clipping gradient-norm diagnostics, early stopping, best-checkpoint restoration, regression metrics, and diagnostic plots.
+- `src/mma3001/hyperparameter_tuning.py`: Optuna TPE search over MLP architecture, learning rate, weight decay, and batch size using validation MSE in original target units.
+- `src/mma3001/main.py`: complete experiment, held-out test evaluation, and output saving; run it with `python -m mma3001`.
 - `requirements.txt`: Python dependencies.
 
 For the module map, data/model-selection boundaries, training lifecycle, and
@@ -25,7 +25,7 @@ the repository root:
 
 ```bash
 python -m pip install -r requirements-dev.txt
-python generate_pdoc.py
+python scripts/generate_pdoc.py
 ```
 
 Open [`docs/api/index.html`](docs/api/index.html) in a browser to browse the
@@ -66,30 +66,27 @@ The MATLAB dataset is approximately 1 GB, so it is **not stored in this GitHub r
 
    `data/dr-benchmark-5415hull/DTMB5415-database.mat`
 
-After setup, the relevant part of the project directory should look like this:
+After setup, the repository is organized into these main areas:
 
 ```text
 MMA3001/
-├── data/
-│   └── dr-benchmark-5415hull/
-│       └── DTMB5415-database.mat
-├── main.py
-├── data_prep.py
-├── neural_network.py
-├── linear_regression.py
-├── hyperparameter_tuning.py
-├── requirements.txt
-└── README.md
+  src/mma3001/       pipeline package
+  tests/             synthetic-data tests
+  scripts/           maintenance and documentation tools
+  data/              dataset location (large archive is not tracked)
+  outputs/           generated results and saved run records
+  docs/api/          generated pdoc reference
+  pyproject.toml     package and build configuration
 ```
 
-The downloaded dataset is excluded from Git tracking because of its size. Download and extract it before running the pipeline. The repository also contains older `data/train.csv`, `data/val.csv`, and `data/test.csv` files from the earlier preprocessing workflow. Their provenance is not recorded, and the current CLI does not read them; do not use them as model inputs or evidence of the current experiment. The `src/data_prep.py` compatibility wrapper now delegates to the canonical loader and cannot synthesize fallback data.
+The downloaded dataset is excluded from Git tracking because of its size. Download and extract it before running the pipeline. The repository also contains older `data/train.csv`, `data/val.csv`, and `data/test.csv` files from the earlier preprocessing workflow. Their provenance is not recorded, and the current CLI does not read them; do not use them as model inputs or evidence of the current experiment. A deprecated compatibility loader remains in `src/mma3001/legacy.py` and delegates to the canonical loader; it cannot synthesize fallback data.
 
 ## Install dependencies
 
 Use a virtual environment if possible, then install dependencies from the repository root:
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -e .
 ```
 
 ## Run the pipeline
@@ -97,20 +94,20 @@ python -m pip install -r requirements.txt
 Once the dataset is in the location above, the program finds it automatically. Run the pipeline with Optuna tuning:
 
 ```bash
-python main.py --target-row 0 --trials 20
+python -m mma3001 --target-row 0 --trials 20
 ```
 
 Training uses a maximum of 1,000 epochs per model and stops early if validation loss does not improve by at least `--min-delta` for 100 consecutive epochs. This larger budget lets training continue longer before early stopping; the final weights still come from the epoch with the lowest qualifying validation loss. Gradient clipping defaults to a global norm of 1.0; set `--grad-clip 0` to disable clipping. Adjust these settings with `--epochs`, `--patience`, `--min-delta`, and `--grad-clip`; for example:
 
 ```bash
-python main.py --target-row 0 --trials 20 --epochs 1500 --patience 150 --min-delta 1e-6 --grad-clip 1.0
+python -m mma3001 --target-row 0 --trials 20 --epochs 1500 --patience 150 --min-delta 1e-6 --grad-clip 1.0
 ```
 
 For a controlled outlier-influence comparison, `--exclude-training-sample` takes a zero-based source sample index and omits it from the training partition after the seeded split is made. Validation and test membership stay the same, so a sample already assigned to either partition cannot be excluded with this option. Use `--comparison-label` to put a clear condition label on the figures. For example, paired runs can retain the point in one output folder and exclude it from training in another:
 
 ```bash
-python main.py --target-row 0 --trials 20 --sweep --comparison-label "Sample 3787 included" --output-dir outputs/sample_3787_included
-python main.py --target-row 0 --trials 20 --sweep --exclude-training-sample 3787 --comparison-label "Sample 3787 excluded from training" --output-dir outputs/sample_3787_excluded
+python -m mma3001 --target-row 0 --trials 20 --sweep --comparison-label "Sample 3787 included" --output-dir outputs/sample_3787_included
+python -m mma3001 --target-row 0 --trials 20 --sweep --exclude-training-sample 3787 --comparison-label "Sample 3787 excluded from training" --output-dir outputs/sample_3787_excluded
 ```
 
 These runs keep the same validation and test samples and retune each training condition independently. The exclusion run is a sensitivity analysis; it does not establish that the source observation is erroneous or justify deleting it from the scientific dataset.
@@ -126,19 +123,19 @@ The sweep and Optuna both train MLPs and both search architecture choices. The s
 To run the architecture sweep without Optuna, add both `--sweep` and `--skip-tuning`:
 
 ```bash
-python main.py --target-row 0 --sweep --skip-tuning
+python -m mma3001 --target-row 0 --sweep --skip-tuning
 ```
 
 To run Optuna and the architecture sweep in the same experiment:
 
 ```bash
-python main.py --target-row 0 --trials 20 --sweep
+python -m mma3001 --target-row 0 --trials 20 --sweep
 ```
 
 To run only the fixed default MLP and skip Optuna, use:
 
 ```bash
-python main.py --target-row 0 --skip-tuning
+python -m mma3001 --target-row 0 --skip-tuning
 ```
 
 ### Reuse an optimized configuration
@@ -146,8 +143,8 @@ python main.py --target-row 0 --skip-tuning
 An Optuna run automatically saves its selected hyperparameters and experiment context to `best_config.json` in the output directory. Reuse that configuration on a later run to skip the Optuna search:
 
 ```bash
-python main.py --target-row 0 --trials 20
-python main.py --target-row 0 --reuse-config outputs/best_config.json
+python -m mma3001 --target-row 0 --trials 20
+python -m mma3001 --target-row 0 --reuse-config outputs/best_config.json
 ```
 
 The reuse option checks the dataset path, file size and modification time, target row, random seed, sample/feature counts, and split fractions. If these do not match the saved search context, the program stops and asks for a matching configuration or a new search. The cached file keeps the selected architecture, learning rate, weight decay, and batch size. Reusing it skips hyperparameter optimization, but still trains the final MLP, evaluates it, and regenerates outputs; it does not reuse saved model weights. Use `--skip-tuning` when you specifically want the fixed default configuration instead.
@@ -167,7 +164,7 @@ The largest practical runtime reduction is to avoid stacking the ten-architectur
 If you have stored the extracted folder somewhere else, pass the full path to the MAT file with `--data`:
 
 ```bash
-python main.py --data "/path/to/DTMB5415-database.mat" --skip-tuning
+python -m mma3001 --data "/path/to/DTMB5415-database.mat" --skip-tuning
 ```
 
 On Windows, quote the full path if it contains spaces.
@@ -185,7 +182,7 @@ drive.mount("/content/drive")
 !git clone https://github.com/oyen-student/MMA3001.git
 %cd MMA3001
 !pip install -r requirements.txt
-!python main.py --data "/content/drive/MyDrive/path/to/DTMB5415-database.mat" --skip-tuning
+!python -m mma3001 --data "/content/drive/MyDrive/path/to/DTMB5415-database.mat" --skip-tuning
 ```
 
 Replace the example path with the actual location of `DTMB5415-database.mat` in your mounted Drive.
@@ -203,7 +200,7 @@ python -m pip install -r requirements-dev.txt
 From the repository root, parse project Python files without writing bytecode, then run pytest:
 
 ```bash
-python -B check_syntax.py
+python -B scripts/check_syntax.py
 python -m pytest -q
 ```
 

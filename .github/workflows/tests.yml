@@ -20,6 +20,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
       - name: Check Python syntax
-        run: python -B check_syntax.py
+        run: python -B scripts/check_syntax.py
       - name: Run test suite
         run: python -m pytest -q

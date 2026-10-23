@@ -7,10 +7,10 @@ from pathlib import Path
 import sys
 from time import perf_counter
 
-from data_prep import load_and_preprocess_data
-from hyperparameter_tuning import run_bayesian_search, best_model_config, plot_optuna_convergence
-from linear_regression import MeanBaseline, train_linear_regression
-from neural_network import (
+from .data_prep import load_and_preprocess_data
+from .hyperparameter_tuning import run_bayesian_search, best_model_config, plot_optuna_convergence
+from .linear_regression import MeanBaseline, train_linear_regression
+from .neural_network import (
     train_optimized_mlp,
     evaluate_pytorch_model,
     regression_metrics,
@@ -114,7 +114,7 @@ def main():
     Command-line options control the dataset path, target row, Optuna trials,
     training limits, gradient clipping, random seed, and output location.
     """
-    project_dir = Path(__file__).resolve().parent
+    project_dir = Path(__file__).resolve().parents[2]
     default_data_path = (
         project_dir / "data" / "dr-benchmark-5415hull" / "DTMB5415-database.mat"
     )
@@ -514,7 +514,7 @@ def main():
                 "output_dir": str(output_dir.resolve()),
                 "plots_montage_path": str(montage_path.resolve()),
                 "runtime_breakdown_plot_path": str(runtime_plot_path.resolve()),
-                "command": [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]],
+                "command": [sys.executable, "-m", "mma3001", *sys.argv[1:]],
                 "python_version": sys.version.split()[0],
                 "runtime_environment": {
                     name: os.environ.get(name)

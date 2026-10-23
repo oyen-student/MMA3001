@@ -1,7 +1,7 @@
 # System architecture
 
 This document describes the current implementation of the DTMB 5415
-hull-resistance regression pipeline. The command-line entry point is `main.py`.
+hull-resistance regression pipeline. The command-line entry point is `src/mma3001/main.py`.
 The workflow reads the MATLAB dataset, prepares leakage-safe partitions,
 compares baseline models with a PyTorch MLP, optionally searches or sweeps MLP
 configurations, evaluates selected models on the held-out test partition, and
@@ -11,45 +11,37 @@ writes metrics and diagnostic plots.
 
 ```text
 MMA3001/
-├── main.py                   CLI and experiment orchestration
-├── data_prep.py              MAT loading, validation, splits, scaling, audit
-├── linear_regression.py      Mean and linear-regression baselines
-├── neural_network.py         PyTorch MLP, training, metrics, plots, sweep
-├── hyperparameter_tuning.py  Optuna TPE search and convergence plot
-├── plots.py                  Legacy plotting helpers for notebooks
-├── src/
-│   └── data_prep.py          Deprecated compatibility wrapper
-├── tests/
-│   └── test_pipeline.py      Synthetic-data unit and CLI smoke tests
-├── check_syntax.py           Parse Python files without writing bytecode
-├── requirements.txt          Runtime dependencies
-├── requirements-dev.txt      Runtime and test dependencies
-└── outputs/                  Default location for generated experiment results
+  src/mma3001/       importable pipeline package and CLI
+  tests/             synthetic-data tests
+  scripts/           syntax and API documentation generators
+  data/              local dataset location (large archive is not tracked)
+  outputs/           current and archived experiment results
+  docs/api/          generated pdoc HTML reference
+  pyproject.toml      package/build/test configuration
 ```
 
-The active CLI imports the root-level modules directly. `plots.py` is retained
-for older notebooks; the active plotting path is implemented in
-`neural_network.py` and `hyperparameter_tuning.py`. The legacy
-`src.data_prep` wrapper delegates to the canonical root-level loader and can
-optionally export split CSVs.
+The CLI runs as `python -m mma3001` after installing the project. The package
+contains the data loader, linear baseline, PyTorch model, Optuna search, plots,
+and run orchestration. `src/mma3001/legacy.py` retains the deprecated CSV-export
+loader for older callers and delegates to the canonical data loader.
 
 ## Module and dependency architecture
 
 ```mermaid
 flowchart LR
     User["User / command line"]
-    CLI["main.py<br/>argument parsing and orchestration"]
-    Prep["data_prep.py<br/>load, validate, split, scale"]
-    Baselines["linear_regression.py<br/>mean and linear baselines"]
-    Model["neural_network.py<br/>MLP, training, metrics, sweep, plots"]
-    Tuning["hyperparameter_tuning.py<br/>Optuna TPE objective and plot"]
-    Legacy["src/data_prep.py<br/>deprecated compatibility wrapper"]
-    LegacyPlots["plots.py<br/>legacy notebook plotting"]
+    CLI["src/mma3001/main.py<br/>argument parsing and orchestration"]
+    Prep["src/mma3001/data_prep.py<br/>load, validate, split, scale"]
+    Baselines["src/mma3001/linear_regression.py<br/>mean and linear baselines"]
+    Model["src/mma3001/neural_network.py<br/>MLP, training, metrics, sweep, plots"]
+    Tuning["src/mma3001/hyperparameter_tuning.py<br/>Optuna TPE objective and plot"]
+    Legacy["src/mma3001/legacy.py<br/>deprecated compatibility wrapper"]
+    LegacyPlots["src/mma3001/plots.py<br/>legacy notebook plotting"]
     Dataset["DTMB5415-database.mat"]
     Deps["NumPy · SciPy · pandas<br/>scikit-learn · PyTorch<br/>Optuna · Matplotlib"]
     Results["Output directory<br/>metrics.json · CSV · PNG"]
     Tests["tests/test_pipeline.py<br/>synthetic MAT data"]
-    Syntax["check_syntax.py"]
+    Syntax["scripts/check_syntax.py"]
 
     User --> CLI
     CLI --> Prep
@@ -78,7 +70,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Start(["Run python main.py"])
+    Start(["Run python -m mma3001"])
     Args["Parse CLI options<br/>dataset, target row, seed, output path,<br/>epochs, tuning and sweep options"]
     Validate{"Options valid<br/>and MAT file exists?"}
     Error["Report input error and stop"]
@@ -181,8 +173,8 @@ and residual diagnostics.
 
 | Component | Main interface | Purpose |
 | --- | --- | --- |
-| CLI | `main()` in `main.py` | Validates options and orchestrates one experiment. |
-| Data preparation | `load_and_preprocess_data()` in `data_prep.py` | Returns scaled feature partitions, original and scaled targets, scalers, target metadata, split sizes, and duplicate audit. |
+| CLI | `main()` in `src/mma3001/main.py` | Validates options and orchestrates one experiment. |
+| Data preparation | `load_and_preprocess_data()` in `src/mma3001/data_prep.py` | Returns scaled feature partitions, original and scaled targets, scalers, target metadata, split sizes, and duplicate audit. |
 | Baselines | `MeanBaseline`, `train_linear_regression()` | Fit training-only reference models. |
 | MLP | `PyTorchMLP`, `train_optimized_mlp()` | Define and train neural regression models with early stopping. |
 | Metrics/evaluation | `evaluate_pytorch_model()`, `regression_metrics()` | Predict in original target units and calculate regression metrics. |
@@ -217,6 +209,7 @@ The CLI writes to `--output-dir` (default `outputs/`):
 validation, split/scaler behavior, duplicate auditing, model training,
 hyperparameter validation, metrics, compatibility behavior, CLI arguments,
 and an end-to-end smoke run. It does not require the full DTMB dataset.
-`check_syntax.py` parses project Python files without writing bytecode.
-`requirements.txt` lists runtime packages; `requirements-dev.txt` includes the
-runtime requirements and pytest.
+`scripts/check_syntax.py` parses project Python files without writing bytecode.
+`pyproject.toml` defines the installable `mma3001` package and runtime
+dependencies. `requirements-dev.txt` installs that package in editable mode and
+adds pytest and pdoc for development and documentation generation.
