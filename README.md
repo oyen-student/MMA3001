@@ -204,6 +204,8 @@ python -B scripts/check_syntax.py
 python -m pytest -q
 ```
 
+Pytest stores temporary test files in the ignored `.pytest-tmp/` directory in the repository. This keeps the suite usable in managed Windows environments where the default user temporary directory may be inaccessible.
+
 The tests cover target-row bounds and metadata, mismatched MATLAB array dimensions, NaN/infinity rejection, train-only scaler fitting with an extreme held-out outlier, exact duplicate detection across splits, Optuna trial validation, the MLP training/prediction interface, known-value regression metrics, the deprecated loader's missing-file behavior, CLI input validation, and a short end-to-end CLI smoke test. GitHub Actions is configured to run these checks on pushes and pull requests. A passing synthetic-data test suite checks core software behavior; it does not validate the real MAT file or independently establish the correctness of its metadata.
 
 ## Outputs

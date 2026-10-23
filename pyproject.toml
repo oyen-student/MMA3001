@@ -31,3 +31,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+# Keep pytest's temporary fixtures in the project workspace. Some managed
+# Windows environments deny access to the user's default %TEMP% pytest folder.
+addopts = ["--basetemp=.pytest-tmp"]
