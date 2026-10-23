@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module linear_regression</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title">linear_regression</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:c%3A%5Cusers%5Corlando%5Conedrive%5Cdocuments%5Cmma3001%5Cproject%5Cmma3001%5Clinear_regression.py">c:\users\orlando\onedrive\documents\mma3001\project\mma3001\linear_regression.py</a></td></tr></table>
+    <p><span class="code">Simple&nbsp;baselines&nbsp;for&nbsp;hull-resistance&nbsp;regression.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="linear_regression.html#MeanBaseline">MeanBaseline</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MeanBaseline">class <strong>MeanBaseline</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Predict&nbsp;the&nbsp;training-set&nbsp;mean&nbsp;for&nbsp;every&nbsp;sample.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MeanBaseline-fit"><strong>fit</strong></a>(self, X, y)</dt><dd><span class="code">Store&nbsp;the&nbsp;mean&nbsp;of&nbsp;the&nbsp;supplied&nbsp;training&nbsp;targets.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;X:&nbsp;Feature&nbsp;matrix,&nbsp;accepted&nbsp;for&nbsp;estimator-interface&nbsp;consistency.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;y:&nbsp;One-dimensional&nbsp;training&nbsp;targets.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;This&nbsp;fitted&nbsp;baseline&nbsp;estimator.</span></dd></dl>
+
+<dl><dt><a name="MeanBaseline-predict"><strong>predict</strong></a>(self, X)</dt><dd><span class="code">Predict&nbsp;the&nbsp;stored&nbsp;training-target&nbsp;mean&nbsp;for&nbsp;every&nbsp;input&nbsp;row.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;X:&nbsp;Feature&nbsp;matrix;&nbsp;its&nbsp;row&nbsp;count&nbsp;determines&nbsp;the&nbsp;number&nbsp;of&nbsp;predictions.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;One-dimensional&nbsp;array&nbsp;of&nbsp;constant&nbsp;predictions.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-train_linear_regression"><strong>train_linear_regression</strong></a>(X_train, y_train)</dt><dd><span class="code">Fit&nbsp;an&nbsp;ordinary&nbsp;least-squares&nbsp;regression&nbsp;model.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;X_train:&nbsp;Training&nbsp;feature&nbsp;matrix.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;y_train:&nbsp;Training&nbsp;targets&nbsp;in&nbsp;their&nbsp;original&nbsp;units.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;fitted&nbsp;scikit-learn&nbsp;LinearRegression&nbsp;estimator.</span></dd></dl>
+</td></tr></table>
+</body></html>
