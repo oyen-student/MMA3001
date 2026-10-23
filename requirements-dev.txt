@@ -1,2 +1,3 @@
 -r requirements.txt
 pytest>=8.0
+pdoc>=15.0,<16.0
